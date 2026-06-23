@@ -4,6 +4,7 @@
     <Project Path="src/TFTCoach.Application/TFTCoach.Application.csproj" />
     <Project Path="src/TFTCoach.Domain/TFTCoach.Domain.csproj" />
     <Project Path="src/TFTCoach.Infrastructure/TFTCoach.Infrastructure.csproj" />
+    <Project Path="src/TFTCoach.Seeder/TFTCoach.Seeder.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TFTCoach.Application.Tests/TFTCoach.Application.Tests.csproj" />

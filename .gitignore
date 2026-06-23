@@ -497,6 +497,7 @@ build/
 .temp/
 supabase/.branches/
 supabase/.temp/
+supabase/snippets/
 
 # Logs and local databases
 *.log
