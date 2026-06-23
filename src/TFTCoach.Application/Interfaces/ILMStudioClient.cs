@@ -10,4 +10,9 @@ public interface ILMStudioClient
     /// Produces an embedding vector for the given text.
     /// </summary>
     Task<IReadOnlyList<float>> EmbedAsync(string text, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Generates a chat completion from a system prompt and user message.
+    /// </summary>
+    Task<string> CompleteAsync(string systemPrompt, string userMessage, CancellationToken cancellationToken = default);
 }

@@ -67,6 +67,9 @@ public class SeedPatchDataUseCaseTests
     {
         public Task<IReadOnlyList<float>> EmbedAsync(string text, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<float>>(Enumerable.Repeat(0.1f, dimension).ToList());
+
+        public Task<string> CompleteAsync(string systemPrompt, string userMessage, CancellationToken cancellationToken = default)
+            => Task.FromResult(string.Empty);
     }
 
     private sealed class RecordingVectorRepository : IVectorRepository
