@@ -253,11 +253,11 @@ Only fire a suggestion when game state meaningfully changes:
 
 ### Phase 3: Seeder
 
-- [ ] `DataDragonService` — fetch champion/item/augment/trait data from Riot API
-- [ ] Patch note fetcher and chunker
-- [ ] `LMStudioClient` — summarize and prepare chunks for embedding
-- [ ] `SupabaseVectorRepository` — upsert embeddings into `tft_patch_data`
-- [ ] CLI flag `--patch 14.x` to re-seed without wiping match history
+- [x] `DataDragonService` — fetch champion/item/augment/trait data from Riot API
+- [x] Patch note fetcher and chunker
+- [x] `LMStudioClient` — summarize and prepare chunks for embedding
+- [x] `SupabaseVectorRepository` — upsert embeddings into `tft_patch_data`
+- [x] CLI flag `--patch 14.x` to re-seed without wiping match history
 
 ### Phase 4: Log Watcher
 
