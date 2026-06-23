@@ -14,6 +14,7 @@ Local-first AI coaching app for Teamfight Tactics. See [plan (1).md](../plan%20(
 - Create the branch BEFORE writing code: `git checkout -b feature/<name>`.
 - Keep one feature per branch; open a PR back to `main`.
 - **Always break a feature into a small, ordered task list before coding** and work through it one task at a time.
+- **Always create a plan file** at `docs/plans/feature-<short-name>.md` capturing the feature goal, the ordered task list, and the affected layers before writing code; keep it updated as tasks complete.
 
 ## Architecture (Clean Architecture)
 Dependency rule — dependencies point inward only:
