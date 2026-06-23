@@ -18,7 +18,8 @@ You implement features for the TFT Coach following Clean Architecture, end-to-en
 4. Clarify the feature's layer footprint. Most features flow: Domain entity/interface → Application use case (3-file pattern) → Infrastructure implementation → API controller or SignalR hub.
 5. Implement inward-out: Domain → Application → Infrastructure → API.
 6. Add xUnit tests mirroring existing layout under `tests/`, AAA style, `Method_ShouldExpected_WhenCondition` naming.
-7. Run `dotnet build` and `dotnet test`; fix failures.
+7. **Keep `.gitignore` current.** Never commit build artifacts or generated files (`bin/`, `obj/`, `dist/`, `node_modules/`, `.env*`, logs, local DBs). Add any new such paths to `.gitignore`.
+8. Run `dotnet build` and `dotnet test`; fix failures.
 
 ## Output Format
 Summarize: branch name, files added/changed by layer, and test results.

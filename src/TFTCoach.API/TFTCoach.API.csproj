@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TFTCoach.Application\TFTCoach.Application.csproj" />
+    <ProjectReference Include="..\TFTCoach.Infrastructure\TFTCoach.Infrastructure.csproj" />
+    <ProjectReference Include="..\TFTCoach.Domain\TFTCoach.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

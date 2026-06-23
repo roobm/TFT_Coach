@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TFTCoach.API/TFTCoach.API.csproj" />
+    <Project Path="src/TFTCoach.Application/TFTCoach.Application.csproj" />
+    <Project Path="src/TFTCoach.Domain/TFTCoach.Domain.csproj" />
+    <Project Path="src/TFTCoach.Infrastructure/TFTCoach.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TFTCoach.Application.Tests/TFTCoach.Application.Tests.csproj" />
+    <Project Path="tests/TFTCoach.Domain.Tests/TFTCoach.Domain.Tests.csproj" />
+    <Project Path="tests/TFTCoach.Infrastructure.Tests/TFTCoach.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

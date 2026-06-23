@@ -13,6 +13,7 @@ Follow this flow:
 5. Implement inward-out: Domain → Application → Infrastructure → API.
 6. Respect the boundaries: never reference Infrastructure from Domain or Application; LM Studio only (no cloud inference); suggestion paths stay stateless.
 7. Add xUnit tests under `tests/`, AAA layout, naming `Method_ShouldExpected_WhenCondition`.
-8. Run `dotnet build` and `dotnet test`; fix any failures.
+8. **Keep `.gitignore` current.** Never commit build artifacts or generated files (`bin/`, `obj/`, `dist/`, `node_modules/`, `.env*`, logs, local DBs). Add any new such paths to `.gitignore`.
+9. Run `dotnet build` and `dotnet test`; fix any failures.
 
 Finish with a summary: branch name, files added/changed by layer, and test results.
