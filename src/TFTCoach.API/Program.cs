@@ -25,7 +25,13 @@ builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy =>
 builder.Services.AddSingleton<RiotRateLimiter>();
 builder.Services.AddTransient<RiotRateLimitHandler>();
 builder.Services.AddHttpClient(nameof(RiotMatchClient), client =>
-    client.BaseAddress = new Uri($"https://{riotRegion}.api.riotgames.com/"))
+{
+    client.BaseAddress = new Uri($"https://{riotRegion}.api.riotgames.com/");
+    // Fetching many matches serialises behind Riot's rate limit (100 req / 2 min),
+    // so a single request can sit in the limiter queue well past the default 100s.
+    // Raise the timeout so the queue wait doesn't cancel the request.
+    client.Timeout = TimeSpan.FromMinutes(10);
+})
     .AddHttpMessageHandler<RiotRateLimitHandler>();
 builder.Services.AddScoped<IRiotMatchClient>(sp =>
 {
