@@ -262,6 +262,9 @@ public class AnalyzeMatchHistoryUseCaseTests
 
         public Task<IReadOnlyList<TftMatchResult>> GetByPuuidAsync(string puuid, int limit, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
+
+        public Task<IReadOnlyList<TftMatchResult>> GetByMatchIdsAsync(string puuid, IReadOnlyList<string> matchIds, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
     }
 
     private sealed class ThrowingMatchHistoryRepository : IMatchHistoryRepository
@@ -270,6 +273,9 @@ public class AnalyzeMatchHistoryUseCaseTests
             => throw new InvalidOperationException("db down");
 
         public Task<IReadOnlyList<TftMatchResult>> GetByPuuidAsync(string puuid, int limit, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
+
+        public Task<IReadOnlyList<TftMatchResult>> GetByMatchIdsAsync(string puuid, IReadOnlyList<string> matchIds, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
     }
 }

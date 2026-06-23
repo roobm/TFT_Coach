@@ -31,9 +31,11 @@ public sealed class SupabaseMatchHistoryRepository(
 
             const string sql = """
                 INSERT INTO match_history
-                    (puuid, match_id, played_at, patch, placement, comp, augments, level)
+                    (puuid, match_id, played_at, patch, placement, comp, augments, level,
+                     traits, units, duration_seconds, players_eliminated)
                 VALUES
-                    (@puuid, @match_id, @played_at, @patch, @placement, @comp, @augments, @level)
+                    (@puuid, @match_id, @played_at, @patch, @placement, @comp, @augments, @level,
+                     @traits, @units, @duration_seconds, @players_eliminated)
                 ON CONFLICT (puuid, match_id) DO NOTHING
                 """;
 
@@ -49,6 +51,10 @@ public sealed class SupabaseMatchHistoryRepository(
                 command.Parameters.AddWithValue("comp", CompLabel(match));
                 command.Parameters.AddWithValue("augments", match.Augments.ToArray());
                 command.Parameters.AddWithValue("level", match.Level);
+                command.Parameters.AddWithValue("traits", match.Traits.ToArray());
+                command.Parameters.AddWithValue("units", match.Units.ToArray());
+                command.Parameters.AddWithValue("duration_seconds", (int)match.DurationSeconds);
+                command.Parameters.AddWithValue("players_eliminated", match.PlayersEliminated);
 
                 written += await command.ExecuteNonQueryAsync(cancellationToken);
             }
@@ -77,8 +83,8 @@ public sealed class SupabaseMatchHistoryRepository(
             await using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
 
-            const string sql = """
-                SELECT match_id, played_at, patch, placement, comp, augments, level
+            const string sql = $"""
+                SELECT {SelectColumns}
                 FROM match_history
                 WHERE puuid = @puuid
                 ORDER BY played_at DESC
@@ -93,15 +99,7 @@ public sealed class SupabaseMatchHistoryRepository(
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                results.Add(new TftMatchResult
-                {
-                    MatchId = reader.GetString(0),
-                    PlayedAt = new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero),
-                    GameVersion = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    Placement = reader.GetInt32(3),
-                    Augments = reader.IsDBNull(5) ? [] : reader.GetFieldValue<string[]>(5),
-                    Level = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
-                });
+                results.Add(MapRow(reader));
             }
 
             return results;
@@ -112,6 +110,65 @@ public sealed class SupabaseMatchHistoryRepository(
             throw;
         }
     }
+
+    public async Task<IReadOnlyList<TftMatchResult>> GetByMatchIdsAsync(
+        string puuid,
+        IReadOnlyList<string> matchIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(puuid) || matchIds.Count == 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            const string sql = $"""
+                SELECT {SelectColumns}
+                FROM match_history
+                WHERE puuid = @puuid AND match_id = ANY(@match_ids)
+                """;
+
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("puuid", puuid);
+            command.Parameters.AddWithValue("match_ids", matchIds.ToArray());
+
+            var results = new List<TftMatchResult>(matchIds.Count);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(MapRow(reader));
+            }
+
+            return results;
+        }
+        catch (NpgsqlException ex)
+        {
+            logger.LogError(ex, "Failed to read cached matches from Supabase.");
+            throw;
+        }
+    }
+
+    private const string SelectColumns =
+        "match_id, played_at, patch, placement, augments, level, traits, units, " +
+        "duration_seconds, players_eliminated";
+
+    private static TftMatchResult MapRow(NpgsqlDataReader reader) => new()
+    {
+        MatchId = reader.GetString(0),
+        PlayedAt = new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero),
+        GameVersion = reader.IsDBNull(2) ? null : reader.GetString(2),
+        Placement = reader.GetInt32(3),
+        Augments = reader.IsDBNull(4) ? [] : reader.GetFieldValue<string[]>(4),
+        Level = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+        Traits = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6),
+        Units = reader.IsDBNull(7) ? [] : reader.GetFieldValue<string[]>(7),
+        DurationSeconds = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
+        PlayersEliminated = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+    };
 
     // A comp is identified by its leading one or two traits (already sorted highest-first).
     private static string CompLabel(TftMatchResult match)

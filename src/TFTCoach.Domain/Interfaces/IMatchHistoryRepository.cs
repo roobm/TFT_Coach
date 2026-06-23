@@ -18,4 +18,13 @@ public interface IMatchHistoryRepository
     /// Returns the most recent stored matches for a PUUID, newest first.
     /// </summary>
     Task<IReadOnlyList<TftMatchResult>> GetByPuuidAsync(string puuid, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the stored matches for a PUUID whose match id is in <paramref name="matchIds"/>.
+    /// Used as a cache so already-fetched matches are not re-requested from the Riot API.
+    /// </summary>
+    Task<IReadOnlyList<TftMatchResult>> GetByMatchIdsAsync(
+        string puuid,
+        IReadOnlyList<string> matchIds,
+        CancellationToken cancellationToken = default);
 }
