@@ -13,6 +13,7 @@ Local-first AI coaching app for Teamfight Tactics. See [plan (1).md](../plan%20(
 - Branch naming: `feature/<short-description>` (e.g. `feature/get-suggestion-usecase`).
 - Create the branch BEFORE writing code: `git checkout -b feature/<name>`.
 - Keep one feature per branch; open a PR back to `main`.
+- **Always break a feature into a small, ordered task list before coding** and work through it one task at a time.
 
 ## Architecture (Clean Architecture)
 Dependency rule — dependencies point inward only:
