@@ -246,10 +246,10 @@ Only fire a suggestion when game state meaningfully changes:
 
 ### Phase 2: Supabase Schema
 
-- [ ] Run migrations for all tables (see Section 4)
-- [ ] Enable pgvector extension: `create extension vector`
-- [ ] Seed one test patch document and verify vector search works
-- [ ] Set up local `.env` with Supabase URL + anon key
+- [x] Run migrations for all tables (see Section 4)
+- [x] Enable pgvector extension: `create extension vector`
+- [x] Seed one test patch document and verify vector search works
+- [x] Set up local `.env` with Supabase URL + anon key
 
 ### Phase 3: Seeder
 
