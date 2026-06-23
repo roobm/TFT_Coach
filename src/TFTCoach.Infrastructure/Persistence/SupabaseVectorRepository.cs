@@ -54,6 +54,54 @@ public sealed class SupabaseVectorRepository(
         }
     }
 
+    public async Task<IReadOnlyList<string>> SearchAsync(
+        IReadOnlyList<float> embedding,
+        int topK,
+        CancellationToken cancellationToken = default)
+    {
+        if (embedding.Count == 0 || topK <= 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            // Cosine distance (<=>) ascending returns the most similar documents first.
+            const string sql = """
+                SELECT content
+                FROM tft_patch_data
+                WHERE content IS NOT NULL
+                ORDER BY embedding <=> @query::vector
+                LIMIT @limit
+                """;
+
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("query", ToVectorLiteral(embedding));
+            command.Parameters.AddWithValue("limit", topK);
+
+            var results = new List<string>(topK);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    results.Add(reader.GetString(0));
+                }
+            }
+
+            logger.LogInformation("Vector search returned {Count} documents from tft_patch_data", results.Count);
+            return results;
+        }
+        catch (NpgsqlException ex)
+        {
+            logger.LogError(ex, "Failed to search patch documents in Supabase.");
+            throw;
+        }
+    }
+
     /// <summary>Formats a vector as the pgvector text literal <c>[v1,v2,...]</c>.</summary>
     private static string ToVectorLiteral(IReadOnlyList<float> embedding)
     {

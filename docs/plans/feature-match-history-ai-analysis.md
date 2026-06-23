@@ -26,14 +26,14 @@ coaching, not here). Inference stays local (LM Studio only).
 
 ## Ordered Task List
 - [x] 0. Create branch `feature/match-history-ai-analysis` from `main`.
-- [ ] 1. Domain: analysis entities + `IVectorRepository.SearchAsync` + `IMatchHistoryRepository`.
-- [ ] 2. Application: deterministic stats + trend calc + RAG retrieval + structured LLM output;
+- [x] 1. Domain: analysis entities + `IVectorRepository.SearchAsync` + `IMatchHistoryRepository`.
+- [x] 2. Application: deterministic stats + trend calc + RAG retrieval + structured LLM output;
        new `Response`, `Request.Puuid`.
-- [ ] 3. Infrastructure: vector cosine search + match-history persistence repository.
-- [ ] 4. Supabase migration: add `puuid` + `match_id` (unique) to `match_history`.
-- [ ] 5. API: register repos in DI; thread `puuid` into the analysis endpoint.
-- [ ] 6. Frontend: structured analysis types + UI.
-- [ ] 7. Tests: xUnit AAA coverage for the use case.
+- [x] 3. Infrastructure: vector cosine search + match-history persistence repository.
+- [x] 4. Supabase migration: add `puuid` + `match_id` (unique) to `match_history`.
+- [x] 5. API: register repos in DI; thread `puuid` into the analysis endpoint.
+- [x] 6. Frontend: structured analysis types + UI.
+- [x] 7. Tests: xUnit AAA coverage for the use case.
 - [ ] 8. `dotnet build` + `dotnet test`; apply migration; fix failures.
 
 ## Notes / Decisions

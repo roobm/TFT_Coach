@@ -16,9 +16,26 @@ export interface MatchHistoryResponse {
   matches: TftMatchResult[];
 }
 
+export type PlacementTrend = 'Improving' | 'Declining' | 'Stable';
+
+export interface CompPerformance {
+  comp: string;
+  games: number;
+  averagePlacement: number;
+}
+
 export interface AnalysisResponse {
-  insights: string;
   matchesAnalyzed: number;
+  averagePlacement: number;
+  top4Rate: number;
+  winRate: number;
+  averageLevel: number;
+  trend: PlacementTrend;
+  topComps: CompPerformance[];
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
+  narrative: string;
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5214';
@@ -37,11 +54,14 @@ export async function fetchMatchHistory(riotId: string, count = 10): Promise<Mat
   return (await response.json()) as MatchHistoryResponse;
 }
 
-export async function analyzeMatches(matches: TftMatchResult[]): Promise<AnalysisResponse> {
+export async function analyzeMatches(
+  matches: TftMatchResult[],
+  puuid?: string,
+): Promise<AnalysisResponse> {
   const response = await fetch(`${API_BASE}/matches/analysis`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matches }),
+    body: JSON.stringify({ matches, puuid }),
   });
   if (!response.ok) {
     throw new Error(await readError(response));

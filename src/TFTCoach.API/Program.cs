@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.GetMatchHistory;
+using TFTCoach.Domain.Interfaces;
 using TFTCoach.Infrastructure.InferenceService;
+using TFTCoach.Infrastructure.Persistence;
 using TFTCoach.Infrastructure.RiotApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +19,9 @@ var riotRegion = Environment.GetEnvironmentVariable("RIOT_REGION") ?? "europe";
 var lmStudioUrl = Environment.GetEnvironmentVariable("LM_STUDIO_URL") ?? "http://localhost:1234/v1";
 var chatModel = Environment.GetEnvironmentVariable("CHAT_MODEL") ?? "local-model";
 var embeddingModel = Environment.GetEnvironmentVariable("EMBEDDING_MODEL") ?? "local-embedding";
+var supabaseDbUrl = Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
+    ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+var dbConnectionString = NpgsqlConnectionStringFactory.FromUrl(supabaseDbUrl);
 
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy =>
     policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod()));
@@ -47,6 +52,12 @@ builder.Services.AddScoped<ILMStudioClient>(sp =>
     var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(LMStudioClient));
     return new LMStudioClient(http, embeddingModel, chatModel, sp.GetRequiredService<ILogger<LMStudioClient>>());
 });
+
+// Supabase persistence (pgvector patch store + match history) via Npgsql.
+builder.Services.AddScoped<IVectorRepository>(sp =>
+    new SupabaseVectorRepository(dbConnectionString, sp.GetRequiredService<ILogger<SupabaseVectorRepository>>()));
+builder.Services.AddScoped<IMatchHistoryRepository>(sp =>
+    new SupabaseMatchHistoryRepository(dbConnectionString, sp.GetRequiredService<ILogger<SupabaseMatchHistoryRepository>>()));
 
 builder.Services.AddScoped<GetMatchHistoryUseCase>();
 builder.Services.AddScoped<AnalyzeMatchHistoryUseCase>();

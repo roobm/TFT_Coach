@@ -81,5 +81,8 @@ public class SeedPatchDataUseCaseTests
             Written.AddRange(documents);
             return Task.FromResult(documents.Count);
         }
+
+        public Task<IReadOnlyList<string>> SearchAsync(IReadOnlyList<float> embedding, int topK, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>([]);
     }
 }

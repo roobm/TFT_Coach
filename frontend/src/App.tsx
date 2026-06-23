@@ -5,6 +5,7 @@ import {
   type AnalysisResponse,
   type TftMatchResult,
 } from './api';
+import { AnalysisPanel } from './components/AnalysisPanel';
 import { MatchList } from './components/MatchList';
 import { MatchListSkeleton } from './components/MatchListSkeleton';
 import { MatchStats } from './components/MatchStats';
@@ -41,6 +42,7 @@ export default function App() {
   const [riotId, setRiotId] = useState('');
   const [count, setCount] = useState(20);
   const [matches, setMatches] = useState<TftMatchResult[]>([]);
+  const [puuid, setPuuid] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -56,10 +58,12 @@ export default function App() {
     setError(null);
     setAnalysis(null);
     setMatches([]);
+    setPuuid(null);
 
     try {
       const result = await fetchMatchHistory(riotId.trim(), count);
       setMatches(result.matches);
+      setPuuid(result.puuid);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches.');
     } finally {
@@ -72,7 +76,7 @@ export default function App() {
     setError(null);
 
     try {
-      const result = await analyzeMatches(matches);
+      const result = await analyzeMatches(matches, puuid ?? undefined);
       setAnalysis(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze matches.');
@@ -158,16 +162,7 @@ export default function App() {
             </button>
           </div>
 
-          {analysis && (
-            <div className="insights">
-              <h3 className="insights-title">
-                <span className="ai-dot" aria-hidden="true" />
-                AI Insights
-                <span className="badge">{analysis.matchesAnalyzed} matches</span>
-              </h3>
-              <pre>{analysis.insights}</pre>
-            </div>
-          )}
+          {analysis && <AnalysisPanel analysis={analysis} />}
 
           <MatchStats matches={matches} />
 

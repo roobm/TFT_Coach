@@ -1,7 +1,10 @@
-namespace TFTCoach.Seeder;
+namespace TFTCoach.Infrastructure.Persistence;
 
-/// <summary>Converts a <c>postgresql://</c> URL into an Npgsql key/value connection string.</summary>
-internal static class NpgsqlConnectionString
+/// <summary>
+/// Converts a <c>postgresql://</c> URL (as printed by <c>supabase status</c>) into an
+/// Npgsql key/value connection string. Pass-through if it is already key/value.
+/// </summary>
+public static class NpgsqlConnectionStringFactory
 {
     public static string FromUrl(string value)
     {
