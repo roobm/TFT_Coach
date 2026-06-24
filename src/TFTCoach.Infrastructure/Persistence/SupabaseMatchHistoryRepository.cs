@@ -35,12 +35,14 @@ public sealed class SupabaseMatchHistoryRepository(
                 INSERT INTO match_history
                     (puuid, match_id, played_at, patch, placement, comp, augments, level,
                      traits, units, duration_seconds, players_eliminated,
-                     gold_left, last_round, total_damage_to_players)
+                     gold_left, last_round, total_damage_to_players, queue_id, set_number)
                 VALUES
                     (@puuid, @match_id, @played_at, @patch, @placement, @comp, @augments, @level,
                      @traits, @units, @duration_seconds, @players_eliminated,
-                     @gold_left, @last_round, @total_damage_to_players)
-                ON CONFLICT (puuid, match_id) DO NOTHING
+                     @gold_left, @last_round, @total_damage_to_players, @queue_id, @set_number)
+                ON CONFLICT (puuid, match_id) DO UPDATE SET
+                    set_number = COALESCE(match_history.set_number, EXCLUDED.set_number),
+                    queue_id = COALESCE(match_history.queue_id, EXCLUDED.queue_id)
                 """;
 
             var written = 0;
@@ -65,6 +67,8 @@ public sealed class SupabaseMatchHistoryRepository(
                 command.Parameters.AddWithValue("gold_left", match.GoldLeft);
                 command.Parameters.AddWithValue("last_round", match.LastRound);
                 command.Parameters.AddWithValue("total_damage_to_players", match.TotalDamageToPlayers);
+                command.Parameters.AddWithValue("queue_id", match.QueueId);
+                command.Parameters.AddWithValue("set_number", match.SetNumber);
 
                 written += await command.ExecuteNonQueryAsync(cancellationToken);
             }
@@ -164,7 +168,7 @@ public sealed class SupabaseMatchHistoryRepository(
 
     private const string SelectColumns =
         "match_id, played_at, patch, placement, augments, level, traits, units, " +
-        "duration_seconds, players_eliminated, gold_left, last_round, total_damage_to_players";
+        "duration_seconds, players_eliminated, gold_left, last_round, total_damage_to_players, queue_id, set_number";
 
     private static readonly JsonSerializerOptions UnitsJson = new(JsonSerializerDefaults.Web);
 
@@ -185,6 +189,8 @@ public sealed class SupabaseMatchHistoryRepository(
         GoldLeft = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
         LastRound = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
         TotalDamageToPlayers = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
+        QueueId = reader.IsDBNull(13) ? 0 : reader.GetInt32(13),
+        SetNumber = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
     };
 
     // A comp is identified by its leading one or two traits (already sorted highest-first).

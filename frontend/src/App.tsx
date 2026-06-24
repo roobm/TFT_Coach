@@ -2,13 +2,18 @@ import { useState } from 'react';
 import {
   analyzeMatches,
   fetchMatchHistory,
+  fetchRanks,
   type AnalysisResponse,
+  type RankedEntry,
+  type RankSnapshot,
   type TftMatchResult,
 } from './api';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { MatchList } from './components/MatchList';
 import { MatchListSkeleton } from './components/MatchListSkeleton';
 import { MatchStats } from './components/MatchStats';
+import { RankCard } from './components/RankCard';
+import { RankClimbChart } from './components/RankClimbChart';
 
 function SearchIcon() {
   return (
@@ -43,6 +48,9 @@ export default function App() {
   const [count, setCount] = useState(20);
   const [matches, setMatches] = useState<TftMatchResult[]>([]);
   const [puuid, setPuuid] = useState<string | null>(null);
+  const [ranks, setRanks] = useState<RankedEntry[] | null>(null);
+  const [rankHistory, setRankHistory] = useState<RankSnapshot[]>([]);
+  const [searchedRiotId, setSearchedRiotId] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -50,7 +58,8 @@ export default function App() {
 
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
-    if (riotId.trim().length === 0) {
+    const trimmed = riotId.trim();
+    if (trimmed.length === 0) {
       return;
     }
 
@@ -59,9 +68,15 @@ export default function App() {
     setAnalysis(null);
     setMatches([]);
     setPuuid(null);
+    setRanks(null);
+    setRankHistory([]);
+    setSearchedRiotId(trimmed);
+
+    // Ranks are a cheap, independent call — fetch them alongside match history.
+    const ranksPromise = fetchRanks(trimmed).catch(() => null);
 
     try {
-      const result = await fetchMatchHistory(riotId.trim(), count);
+      const result = await fetchMatchHistory(trimmed, count);
       setMatches(result.matches);
       setPuuid(result.puuid);
     } catch (err) {
@@ -69,6 +84,10 @@ export default function App() {
     } finally {
       setLoadingMatches(false);
     }
+
+    const rankResult = await ranksPromise;
+    setRanks(rankResult?.entries ?? null);
+    setRankHistory(rankResult?.history ?? []);
   }
 
   async function handleAnalyze() {
@@ -170,6 +189,16 @@ export default function App() {
           </div>
 
           {analysis && <AnalysisPanel analysis={analysis} />}
+
+          {ranks && <RankCard riotId={searchedRiotId} entries={ranks} />}
+
+          {ranks && (
+            <RankClimbChart
+              matches={matches}
+              current={ranks.find((entry) => entry.queueType === 'RANKED_TFT')}
+              history={rankHistory}
+            />
+          )}
 
           <MatchStats matches={matches} />
 

@@ -883,28 +883,39 @@ button:disabled {
   font-weight: 600;
 }
 
-.chart .bar.first rect {
+.chart .baseline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart .bar.first path {
   fill: var(--gold);
 }
 
-.chart .bar.top rect {
+.chart .bar.top path {
   fill: var(--green);
 }
 
-.chart .bar.bottom rect {
+.chart .bar.bottom path {
   fill: var(--red);
 }
 
 .chart .grid {
   stroke: var(--border);
   stroke-width: 1;
-  stroke-dasharray: 3 3;
+  stroke-dasharray: 2 5;
+  opacity: 0.5;
+}
+
+.chart .trend-area {
+  fill: url(#trend-area-fill);
+  stroke: none;
 }
 
 .chart .trend-line {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 2.25;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
@@ -925,6 +936,296 @@ button:disabled {
   .charts {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* ---------- Ranked standing ---------- */
+.rank-panel {
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+.rank-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.9rem;
+}
+
+.rank-panel-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.rank-player {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent-strong);
+}
+
+.rank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.rank-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.rank-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--rank-accent, var(--accent));
+}
+
+.rank-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rank-queue {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rank-streak {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--gold);
+  background: var(--gold-soft);
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.rank-tier {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rank-emblem {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--rank-accent, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rank-accent, var(--accent)) 22%, transparent);
+}
+
+.rank-tier-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.rank-lp {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.rank-record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.rank-record-wl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rank-win {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.rank-loss {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.rank-sep {
+  color: var(--text-faint);
+}
+
+.rank-winrate {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.rank-unranked {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* ---------- Rank climb chart ---------- */
+.climb {
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+.climb-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.climb-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.climb-net {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.climb-net.up {
+  color: var(--green);
+}
+
+.climb-net.down {
+  color: var(--red);
+}
+
+.climb-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.climb-chart {
+  width: 100%;
+  height: auto;
+}
+
+.climb-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+  opacity: 0.5;
+}
+
+.climb-band-label {
+  fill: var(--text-faint);
+  font-size: 10px;
+}
+
+.climb-area {
+  fill: url(#climb-area-fill);
+  stroke: none;
+}
+
+.climb-line {
+  fill: none;
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.climb-estimate {
+  stroke: var(--accent);
+}
+
+.climb-real {
+  stroke: var(--gold);
+  stroke-dasharray: 5 4;
+  opacity: 0.9;
+}
+
+.climb-dot {
+  fill: var(--gold);
+  stroke: var(--bg-elev-1);
+  stroke-width: 1.5;
+}
+
+.climb-connector {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.climb-end-dot {
+  fill: var(--accent);
+  stroke: var(--bg-elev-1);
+  stroke-width: 2;
+}
+
+.climb-badge-bg {
+  fill: var(--accent);
+  stroke: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+.climb-badge-text {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.climb-legend {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.climb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.climb-swatch {
+  width: 16px;
+  height: 0;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+
+.climb-swatch.estimate {
+  border-top-color: var(--accent);
+}
+
+.climb-swatch.real {
+  border-top-style: dashed;
+  border-top-color: var(--gold);
 }
 
 /* ---------- Responsive ---------- */

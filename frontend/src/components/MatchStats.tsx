@@ -11,16 +11,43 @@ function pct(part: number, total: number): string {
   return `${Math.round((part / total) * 100)}%`;
 }
 
+// Bar with only its top corners rounded, sitting flush on the baseline.
+function topRoundedRect(x: number, y: number, w: number, h: number, r: number): string {
+  const rr = Math.min(r, w / 2, h);
+  return `M ${x} ${y + h} L ${x} ${y + rr} Q ${x} ${y} ${x + rr} ${y} L ${x + w - rr} ${y} Q ${x + w} ${y} ${x + w} ${y + rr} L ${x + w} ${y + h} Z`;
+}
+
+// Smooth Catmull-Rom → cubic-bezier path (matches the rank climb chart treatment).
+function smoothLine(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+  const tension = 0.18;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) * tension;
+    const c1y = p1.y + (p2.y - p0.y) * tension;
+    const c2x = p2.x - (p3.x - p1.x) * tension;
+    const c2y = p2.y - (p3.y - p1.y) * tension;
+    d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
 // ---------- Distribution (1st..8th) bar chart ----------
 function DistributionChart({ counts }: { counts: number[] }) {
   const max = Math.max(1, ...counts);
   const width = 320;
   const height = 150;
   const padBottom = 24;
-  const padTop = 16;
+  const padTop = 18;
   const slot = width / counts.length;
   const barW = slot * 0.56;
   const usableH = height - padBottom - padTop;
+  const baselineY = padTop + usableH;
 
   return (
     <svg
@@ -29,11 +56,12 @@ function DistributionChart({ counts }: { counts: number[] }) {
       role="img"
       aria-label="Placement distribution"
     >
+      <line className="baseline" x1={6} x2={width - 6} y1={baselineY} y2={baselineY} />
       {counts.map((c, i) => {
         const placement = i + 1;
-        const barH = (c / max) * usableH;
+        const barH = c > 0 ? Math.max((c / max) * usableH, 4) : 0;
         const x = i * slot + (slot - barW) / 2;
-        const y = padTop + (usableH - barH);
+        const y = baselineY - barH;
         return (
           <g key={placement} className={`bar ${tone(placement)}`}>
             {c > 0 && (
@@ -41,7 +69,7 @@ function DistributionChart({ counts }: { counts: number[] }) {
                 {c}
               </text>
             )}
-            <rect x={x} y={y} width={barW} height={Math.max(barH, c > 0 ? 2 : 0)} rx={3} />
+            {c > 0 && <path d={topRoundedRect(x, y, barW, barH, 4)} />}
             <text
               className="axis-label"
               x={x + barW / 2}
@@ -72,10 +100,20 @@ function TrendChart({ placements }: { placements: number[] }) {
   const yFor = (p: number) => padTop + ((p - 1) / 7) * usableH;
   const xFor = (i: number) => (n <= 1 ? padX + usableW / 2 : padX + (i / (n - 1)) * usableW);
 
-  const points = placements.map((p, i) => `${xFor(i)},${yFor(p)}`).join(' ');
+  const pts = placements.map((p, i) => ({ x: xFor(i), y: yFor(p) }));
+  const linePath = smoothLine(pts);
+  const baselineY = yFor(8);
+  const areaPath =
+    pts.length >= 2 ? `${linePath} L ${pts[pts.length - 1].x} ${baselineY} L ${pts[0].x} ${baselineY} Z` : '';
 
   return (
     <svg className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Placement over time">
+      <defs>
+        <linearGradient id="trend-area-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
       {[1, 4, 8].map((p) => (
         <g key={p}>
           <line className="grid" x1={padX} x2={width - padX} y1={yFor(p)} y2={yFor(p)} />
@@ -84,9 +122,10 @@ function TrendChart({ placements }: { placements: number[] }) {
           </text>
         </g>
       ))}
-      {n > 1 && <polyline className="trend-line" points={points} />}
-      {placements.map((p, i) => (
-        <circle key={i} className={`trend-dot ${tone(p)}`} cx={xFor(i)} cy={yFor(p)} r={3.5} />
+      {areaPath && <path className="trend-area" d={areaPath} />}
+      {n > 1 && <path className="trend-line" d={linePath} />}
+      {pts.map((pt, i) => (
+        <circle key={i} className={`trend-dot ${tone(placements[i])}`} cx={pt.x} cy={pt.y} r={3.5} />
       ))}
     </svg>
   );

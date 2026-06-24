@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.GetMatchHistory;
+using TFTCoach.Application.UseCases.GetRanks;
 using TFTCoach.Domain.Interfaces;
 using TFTCoach.Infrastructure.InferenceService;
 using TFTCoach.Infrastructure.Persistence;
@@ -17,6 +18,8 @@ const string CorsPolicy = "frontend";
 var frontendOrigin = Environment.GetEnvironmentVariable("FRONTEND_ORIGIN") ?? "http://localhost:5173";
 var riotApiKey = Environment.GetEnvironmentVariable("RIOT_API_KEY") ?? string.Empty;
 var riotRegion = Environment.GetEnvironmentVariable("RIOT_REGION") ?? "europe";
+// League-V1 is platform-routed (euw1, na1, kr, ...), unlike the regional match endpoints.
+var riotPlatform = Environment.GetEnvironmentVariable("RIOT_PLATFORM") ?? "euw1";
 var lmStudioUrl = Environment.GetEnvironmentVariable("LM_STUDIO_URL") ?? "http://localhost:1234/v1";
 var chatModel = Environment.GetEnvironmentVariable("CHAT_MODEL") ?? "local-model";
 var embeddingModel = Environment.GetEnvironmentVariable("EMBEDDING_MODEL") ?? "local-embedding";
@@ -50,6 +53,19 @@ builder.Services.AddScoped<IRiotMatchClient>(sp =>
     return new RiotMatchClient(http, riotApiKey, sp.GetRequiredService<ILogger<RiotMatchClient>>());
 });
 
+// Riot league client (platform routing host) for ranked standing.
+builder.Services.AddHttpClient(nameof(RiotLeagueClient), client =>
+{
+    client.BaseAddress = new Uri($"https://{riotPlatform}.api.riotgames.com/");
+    client.Timeout = TimeSpan.FromMinutes(2);
+})
+    .AddHttpMessageHandler<RiotRateLimitHandler>();
+builder.Services.AddScoped<IRiotLeagueClient>(sp =>
+{
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(RiotLeagueClient));
+    return new RiotLeagueClient(http, riotApiKey, sp.GetRequiredService<ILogger<RiotLeagueClient>>());
+});
+
 // Local LM Studio client.
 builder.Services.AddHttpClient(nameof(LMStudioClient), client =>
 {
@@ -69,9 +85,12 @@ builder.Services.AddScoped<IVectorRepository>(sp =>
     new SupabaseVectorRepository(dbConnectionString, sp.GetRequiredService<ILogger<SupabaseVectorRepository>>()));
 builder.Services.AddScoped<IMatchHistoryRepository>(sp =>
     new SupabaseMatchHistoryRepository(dbConnectionString, sp.GetRequiredService<ILogger<SupabaseMatchHistoryRepository>>()));
+builder.Services.AddScoped<IRankHistoryRepository>(sp =>
+    new SupabaseRankHistoryRepository(dbConnectionString, sp.GetRequiredService<ILogger<SupabaseRankHistoryRepository>>()));
 
 builder.Services.AddScoped<GetMatchHistoryUseCase>();
 builder.Services.AddScoped<AnalyzeMatchHistoryUseCase>();
+builder.Services.AddScoped<GetRanksUseCase>();
 
 var app = builder.Build();
 app.UseCors(CorsPolicy);
@@ -108,6 +127,30 @@ app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, Anal
 {
     var response = await useCase.ExecuteAsync(request, ct);
     return Results.Ok(response);
+});
+
+// GET /ranks?riotId=Name%23TAG
+app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, CancellationToken ct) =>
+{
+    if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
+    {
+        return Results.BadRequest("riotId must be in the form gameName#tagLine.");
+    }
+
+    try
+    {
+        var response = await useCase.ExecuteAsync(new GetRanksRequest
+        {
+            GameName = gameName,
+            TagLine = tagLine,
+        }, ct);
+
+        return Results.Ok(response);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(ex.Message);
+    }
 });
 
 app.Run();
