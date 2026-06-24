@@ -26,6 +26,7 @@ export function Layout() {
         <nav className="app-nav" aria-label="Primary">
           <NavLink to="/" end className={navClass}>Matches</NavLink>
           <NavLink to="/history" className={navClass}>History</NavLink>
+          <NavLink to="/live-coach" className={navClass}>Live Coach</NavLink>
         </nav>
       </header>
 

@@ -1,9 +1,11 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using TFTCoach.API.Hubs;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.GetMatchHistory;
 using TFTCoach.Application.UseCases.GetRanks;
+using TFTCoach.Application.UseCases.GetSuggestion;
 using TFTCoach.Domain.Interfaces;
 using TFTCoach.Infrastructure.InferenceService;
 using TFTCoach.Infrastructure.Persistence;
@@ -27,8 +29,17 @@ var supabaseDbUrl = Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
     ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 var dbConnectionString = NpgsqlConnectionStringFactory.FromUrl(supabaseDbUrl);
 
+// AllowCredentials is required for the SignalR browser client to negotiate a
+// cross-origin connection; the origin is already pinned to the frontend.
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy =>
-    policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod()));
+    policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+
+// SignalR uses its own JSON protocol, so register the string-enum converter here
+// too — otherwise SuggestionCategory would serialise as an integer to the client.
+// Detailed errors are enabled: this is a local-first dev app with no remote clients.
+builder.Services.AddSignalR(options => options.EnableDetailedErrors = true)
+    .AddJsonProtocol(options =>
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // Serialize enums (e.g. PlacementTrend) as their string names so the typed
 // frontend contract receives "Stable"/"Improving"/"Declining", not integers.
@@ -91,6 +102,7 @@ builder.Services.AddScoped<IRankHistoryRepository>(sp =>
 builder.Services.AddScoped<GetMatchHistoryUseCase>();
 builder.Services.AddScoped<AnalyzeMatchHistoryUseCase>();
 builder.Services.AddScoped<GetRanksUseCase>();
+builder.Services.AddScoped<GetSuggestionUseCase>();
 
 var app = builder.Build();
 app.UseCors(CorsPolicy);
@@ -153,6 +165,9 @@ app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, Cancellation
         return Results.NotFound(ex.Message);
     }
 });
+
+// SignalR hub for live, real-time coaching suggestions.
+app.MapHub<CoachHub>("/hubs/coach");
 
 app.Run();
 
