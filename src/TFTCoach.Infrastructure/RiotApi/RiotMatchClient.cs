@@ -60,12 +60,13 @@ public sealed class RiotMatchClient(
         }
     }
 
-    // The Riot ids endpoint returns at most 100 ids per request, so page through
-    // with the start offset until we have the requested count (or run out).
+    // The Riot ids endpoint returns at most 200 ids per request, so page through
+    // with the start offset until we have the requested count (or run out). Pass
+    // int.MaxValue to fetch every available match id.
     private async Task<List<string>> GetMatchIdsAsync(string puuid, int count, CancellationToken cancellationToken)
     {
-        const int pageSize = 100;
-        var ids = new List<string>(count);
+        const int pageSize = 200;
+        var ids = new List<string>(Math.Min(count, pageSize));
         var start = 0;
 
         while (ids.Count < count)
@@ -120,6 +121,9 @@ public sealed class RiotMatchClient(
                 Placement = participant.Placement,
                 Level = participant.Level,
                 PlayersEliminated = participant.PlayersEliminated,
+                GoldLeft = participant.GoldLeft,
+                LastRound = participant.LastRound,
+                TotalDamageToPlayers = participant.TotalDamageToPlayers,
                 Traits = participant.Traits?
                     .Where(t => t.TierCurrent > 0)
                     .OrderByDescending(t => t.TierCurrent)
@@ -127,8 +131,13 @@ public sealed class RiotMatchClient(
                     .ToList() ?? [],
                 Augments = participant.Augments ?? [],
                 Units = participant.Units?
-                    .Select(u => u.CharacterId ?? string.Empty)
-                    .Where(id => id.Length > 0)
+                    .Where(u => !string.IsNullOrEmpty(u.CharacterId))
+                    .Select(u => new UnitDetail
+                    {
+                        Name = u.CharacterId!,
+                        Tier = u.Tier,
+                        Items = u.ItemNames ?? [],
+                    })
                     .ToList() ?? [],
             };
         }
@@ -181,11 +190,17 @@ public sealed class RiotMatchClient(
         int Placement,
         int Level,
         int PlayersEliminated,
+        int GoldLeft,
+        int LastRound,
+        int TotalDamageToPlayers,
         List<string>? Augments,
         List<TraitDto>? Traits,
         List<UnitDto>? Units);
 
     private sealed record TraitDto(string? Name, [property: JsonPropertyName("tier_current")] int TierCurrent);
 
-    private sealed record UnitDto([property: JsonPropertyName("character_id")] string? CharacterId);
+    private sealed record UnitDto(
+        [property: JsonPropertyName("character_id")] string? CharacterId,
+        int Tier,
+        [property: JsonPropertyName("itemNames")] List<string>? ItemNames);
 }

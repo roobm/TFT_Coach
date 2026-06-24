@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
@@ -26,6 +27,11 @@ var dbConnectionString = NpgsqlConnectionStringFactory.FromUrl(supabaseDbUrl);
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy =>
     policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod()));
 
+// Serialize enums (e.g. PlacementTrend) as their string names so the typed
+// frontend contract receives "Stable"/"Improving"/"Declining", not integers.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
 // Riot match client (regional routing host).
 builder.Services.AddSingleton<RiotRateLimiter>();
 builder.Services.AddTransient<RiotRateLimitHandler>();
@@ -46,7 +52,12 @@ builder.Services.AddScoped<IRiotMatchClient>(sp =>
 
 // Local LM Studio client.
 builder.Services.AddHttpClient(nameof(LMStudioClient), client =>
-    client.BaseAddress = new Uri(lmStudioUrl.TrimEnd('/') + "/"));
+{
+    client.BaseAddress = new Uri(lmStudioUrl.TrimEnd('/') + "/");
+    // In-depth analysis over many matches can take a while on local hardware, so
+    // raise the timeout well past the default 100s to avoid cancelling inference.
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
 builder.Services.AddScoped<ILMStudioClient>(sp =>
 {
     var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(LMStudioClient));

@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using NpgsqlTypes;
+using System.Text.Json;
 using TFTCoach.Domain.Entities;
 using TFTCoach.Domain.Interfaces;
 
@@ -32,10 +34,12 @@ public sealed class SupabaseMatchHistoryRepository(
             const string sql = """
                 INSERT INTO match_history
                     (puuid, match_id, played_at, patch, placement, comp, augments, level,
-                     traits, units, duration_seconds, players_eliminated)
+                     traits, units, duration_seconds, players_eliminated,
+                     gold_left, last_round, total_damage_to_players)
                 VALUES
                     (@puuid, @match_id, @played_at, @patch, @placement, @comp, @augments, @level,
-                     @traits, @units, @duration_seconds, @players_eliminated)
+                     @traits, @units, @duration_seconds, @players_eliminated,
+                     @gold_left, @last_round, @total_damage_to_players)
                 ON CONFLICT (puuid, match_id) DO NOTHING
                 """;
 
@@ -52,9 +56,15 @@ public sealed class SupabaseMatchHistoryRepository(
                 command.Parameters.AddWithValue("augments", match.Augments.ToArray());
                 command.Parameters.AddWithValue("level", match.Level);
                 command.Parameters.AddWithValue("traits", match.Traits.ToArray());
-                command.Parameters.AddWithValue("units", match.Units.ToArray());
+                command.Parameters.Add(new NpgsqlParameter("units", NpgsqlDbType.Jsonb)
+                {
+                    Value = JsonSerializer.Serialize(match.Units, UnitsJson),
+                });
                 command.Parameters.AddWithValue("duration_seconds", (int)match.DurationSeconds);
                 command.Parameters.AddWithValue("players_eliminated", match.PlayersEliminated);
+                command.Parameters.AddWithValue("gold_left", match.GoldLeft);
+                command.Parameters.AddWithValue("last_round", match.LastRound);
+                command.Parameters.AddWithValue("total_damage_to_players", match.TotalDamageToPlayers);
 
                 written += await command.ExecuteNonQueryAsync(cancellationToken);
             }
@@ -154,7 +164,9 @@ public sealed class SupabaseMatchHistoryRepository(
 
     private const string SelectColumns =
         "match_id, played_at, patch, placement, augments, level, traits, units, " +
-        "duration_seconds, players_eliminated";
+        "duration_seconds, players_eliminated, gold_left, last_round, total_damage_to_players";
+
+    private static readonly JsonSerializerOptions UnitsJson = new(JsonSerializerDefaults.Web);
 
     private static TftMatchResult MapRow(NpgsqlDataReader reader) => new()
     {
@@ -165,9 +177,14 @@ public sealed class SupabaseMatchHistoryRepository(
         Augments = reader.IsDBNull(4) ? [] : reader.GetFieldValue<string[]>(4),
         Level = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
         Traits = reader.IsDBNull(6) ? [] : reader.GetFieldValue<string[]>(6),
-        Units = reader.IsDBNull(7) ? [] : reader.GetFieldValue<string[]>(7),
+        Units = reader.IsDBNull(7)
+            ? []
+            : JsonSerializer.Deserialize<List<UnitDetail>>(reader.GetFieldValue<string>(7), UnitsJson) ?? [],
         DurationSeconds = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
         PlayersEliminated = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+        GoldLeft = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+        LastRound = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
+        TotalDamageToPlayers = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
     };
 
     // A comp is identified by its leading one or two traits (already sorted highest-first).

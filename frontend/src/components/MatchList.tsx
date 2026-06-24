@@ -1,4 +1,4 @@
-import type { TftMatchResult } from '../api';
+import type { TftMatchResult, UnitDetail } from '../api';
 
 function placementTone(placement: number): 'first' | 'top' | 'bottom' {
   if (placement === 1) return 'first';
@@ -79,8 +79,8 @@ function ChipGroup({
     <div className="chip-group">
       <span className="chip-group-label">{label}</span>
       <div className="chips">
-        {visible.map((item) => (
-          <span key={item} className={`chip ${variant}`}>
+        {visible.map((item, idx) => (
+          <span key={`${item}-${idx}`} className={`chip ${variant}`}>
             {cleanName(item)}
           </span>
         ))}
@@ -88,6 +88,11 @@ function ChipGroup({
       </div>
     </div>
   );
+}
+
+// "TFT17_Briar" tier 3 -> "Briar 3\u2605"; 1-star kept implicit to reduce noise.
+function unitLabel(unit: UnitDetail): string {
+  return unit.tier >= 2 ? `${unit.name} ${unit.tier}\u2605` : unit.name;
 }
 
 function MatchCard({ match }: { match: TftMatchResult }) {
@@ -130,7 +135,7 @@ function MatchCard({ match }: { match: TftMatchResult }) {
       {match.augments.length > 0 && (
         <ChipGroup label="Augments" items={match.augments} variant="augment" />
       )}
-      <ChipGroup label="Comp" items={match.units} variant="unit" />
+      <ChipGroup label="Comp" items={match.units.map(unitLabel)} variant="unit" />
     </li>
   );
 }

@@ -1,3 +1,9 @@
+export interface UnitDetail {
+  name: string;
+  tier: number;
+  items: string[];
+}
+
 export interface TftMatchResult {
   matchId: string;
   playedAt: string;
@@ -6,9 +12,12 @@ export interface TftMatchResult {
   placement: number;
   level: number;
   playersEliminated: number;
+  goldLeft: number;
+  lastRound: number;
+  totalDamageToPlayers: number;
   traits: string[];
   augments: string[];
-  units: string[];
+  units: UnitDetail[];
 }
 
 export interface MatchHistoryResponse {

@@ -89,7 +89,9 @@ public sealed class AnalyzeMatchHistoryUseCase(
         var patchContext = await RetrievePatchContextAsync(topComps, matches, cancellationToken);
 
         var userMessage = BuildPrompt(stats, topComps, trend, matches, patchContext);
-        var raw = await inference.CompleteAsync(SystemPrompt, userMessage, cancellationToken);
+        // Qwen3 hybrid-reasoning soft switch: /no_think must be the last token of the
+        // user turn to suppress the model's chain-of-thought and answer directly.
+        var raw = await inference.CompleteAsync(SystemPrompt, userMessage + "\n\n/no_think", cancellationToken);
         var narrative = ParseNarrative(raw);
 
         logger.LogInformation("Generated structured analysis from {Count} matches", matches.Count);
@@ -282,9 +284,11 @@ public sealed class AnalyzeMatchHistoryUseCase(
         {
             var match = matches[i];
             builder.AppendLine(culture,
-                $"{i + 1}. Placement {match.Placement}, level {match.Level}. " +
+                $"{i + 1}. Placement {match.Placement}, level {match.Level}, " +
+                $"gold left {match.GoldLeft}, last round {match.LastRound}, " +
+                $"combat damage {match.TotalDamageToPlayers}. " +
                 $"Traits: {Join(match.Traits)}. Augments: {Join(match.Augments)}. " +
-                $"Units: {Join(match.Units)}.");
+                $"Units: {FormatUnits(match.Units)}.");
         }
 
         if (patchContext.Count > 0)
@@ -342,6 +346,31 @@ public sealed class AnalyzeMatchHistoryUseCase(
 
     private static string Join(IReadOnlyList<string> values) =>
         values.Count == 0 ? "none" : string.Join(", ", values);
+
+    // Renders units as "Name 3* [Item, Item]", omitting star/items when unknown.
+    private static string FormatUnits(IReadOnlyList<UnitDetail> units)
+    {
+        if (units.Count == 0)
+        {
+            return "none";
+        }
+
+        return string.Join(", ", units.Select(unit =>
+        {
+            var stars = unit.Tier > 0 ? $" {unit.Tier}*" : string.Empty;
+            var items = unit.Items.Count > 0
+                ? $" [{string.Join(", ", unit.Items.Select(CleanItemName))}]"
+                : string.Empty;
+            return $"{CleanItemName(unit.Name)}{stars}{items}";
+        }));
+    }
+
+    // Strips Riot id prefixes ("TFT_Item_", "TFT9_Item_", "TFT17_") for readability/tokens.
+    private static string CleanItemName(string raw)
+    {
+        var idx = raw.LastIndexOf('_');
+        return idx >= 0 && idx < raw.Length - 1 ? raw[(idx + 1)..] : raw;
+    }
 
     private readonly record struct Stats(
         double AveragePlacement,

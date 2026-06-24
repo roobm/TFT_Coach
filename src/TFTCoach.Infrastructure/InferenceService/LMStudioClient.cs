@@ -48,7 +48,8 @@ public sealed class LMStudioClient(
                 [
                     new ChatMessage("system", systemPrompt),
                     new ChatMessage("user", userMessage),
-                ]);
+                ],
+                Temperature: 0.4);
 
             using var response = await httpClient.PostAsJsonAsync("chat/completions", request, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -81,7 +82,8 @@ public sealed class LMStudioClient(
 
     private sealed record ChatRequest(
         [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("messages")] IReadOnlyList<ChatMessage> Messages);
+        [property: JsonPropertyName("messages")] IReadOnlyList<ChatMessage> Messages,
+        [property: JsonPropertyName("temperature")] double Temperature);
 
     private sealed record ChatMessage(
         [property: JsonPropertyName("role")] string Role,

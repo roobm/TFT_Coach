@@ -113,9 +113,16 @@ export default function App() {
           aria-label="Number of matches"
           disabled={loadingMatches}
         >
-          {[10, 20, 50, 100, 200].map((n) => (
-            <option key={n} value={n}>
-              {n} games
+          {[
+            { value: 10, label: '10 games' },
+            { value: 20, label: '20 games' },
+            { value: 50, label: '50 games' },
+            { value: 100, label: '100 games' },
+            { value: 200, label: '200 games' },
+            { value: 0, label: 'All games' },
+          ].map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>

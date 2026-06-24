@@ -1,10 +1,11 @@
 import type { AnalysisResponse, PlacementTrend } from '../api';
 
 function TrendBadge({ trend }: { trend: PlacementTrend }) {
-  const symbol = trend === 'Improving' ? '▲' : trend === 'Declining' ? '▼' : '■';
+  const label = String(trend);
+  const symbol = label === 'Improving' ? '▲' : label === 'Declining' ? '▼' : '■';
   return (
-    <span className={`trend trend-${trend.toLowerCase()}`}>
-      <span aria-hidden="true">{symbol}</span> {trend}
+    <span className={`trend trend-${label.toLowerCase()}`}>
+      <span aria-hidden="true">{symbol}</span> {label}
     </span>
   );
 }

@@ -32,7 +32,7 @@ public class GetMatchHistoryUseCaseTests
     }
 
     [Theory]
-    [InlineData(0, 1)]
+    [InlineData(1, 1)]
     [InlineData(50, 50)]
     [InlineData(500, 200)]
     public async Task ExecuteAsync_ShouldClampCount_WhenOutOfRange(int requested, int expected)
@@ -51,6 +51,27 @@ public class GetMatchHistoryUseCaseTests
 
         // Assert
         Assert.Equal(expected, client.LastCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task ExecuteAsync_ShouldRequestAllMatches_WhenCountIsZeroOrNegative(int requested)
+    {
+        // Arrange
+        var client = new FakeRiotMatchClient("puuid", []);
+        var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
+
+        // Act
+        await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        {
+            GameName = "Name",
+            TagLine = "TAG",
+            Count = requested,
+        });
+
+        // Assert
+        Assert.Equal(int.MaxValue, client.LastCount);
     }
 
     [Fact]

@@ -19,7 +19,9 @@ public sealed class GetMatchHistoryUseCase(
         GetMatchHistoryRequest request,
         CancellationToken cancellationToken = default)
     {
-        var count = Math.Clamp(request.Count, 1, 200);
+        // Count <= 0 is the "fetch everything" sentinel: page through all of the
+        // player's match ids. A positive count is clamped to a single page request.
+        var count = request.Count <= 0 ? int.MaxValue : Math.Clamp(request.Count, 1, 200);
 
         var puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
         var matchIds = await riotClient.GetRecentMatchIdsAsync(puuid, count, cancellationToken);
