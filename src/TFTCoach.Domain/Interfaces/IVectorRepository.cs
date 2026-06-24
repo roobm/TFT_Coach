@@ -12,4 +12,13 @@ public interface IVectorRepository
     /// </summary>
     /// <returns>The number of documents written.</returns>
     Task<int> UpsertAsync(IReadOnlyList<PatchDocument> documents, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the <paramref name="topK"/> stored documents whose embeddings are most
+    /// similar (cosine distance) to <paramref name="embedding"/>, as their text content.
+    /// </summary>
+    Task<IReadOnlyList<string>> SearchAsync(
+        IReadOnlyList<float> embedding,
+        int topK,
+        CancellationToken cancellationToken = default);
 }

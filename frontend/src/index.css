@@ -326,6 +326,167 @@ button:disabled {
   color: var(--text);
 }
 
+/* ---------- Analysis panel ---------- */
+.trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.trend-improving {
+  color: #5ad08a;
+  background: rgba(90, 208, 138, 0.12);
+  border-color: rgba(90, 208, 138, 0.4);
+}
+
+.trend-declining {
+  color: #ff7676;
+  background: rgba(255, 118, 118, 0.12);
+  border-color: rgba(255, 118, 118, 0.4);
+}
+
+.trend-stable {
+  color: var(--text-muted);
+  background: var(--bg-elev-2);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.7rem 0.8rem;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comp-list,
+.point-list {
+  margin-bottom: 1rem;
+}
+
+.comp-list h4,
+.point-list h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.comp-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.comp-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.5rem 0.7rem;
+}
+
+.comp-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comp-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.point-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.point-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.point-list li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.point-list li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.point-strength li::before {
+  content: '✓';
+  color: #5ad08a;
+}
+
+.point-weakness li::before {
+  content: '!';
+  color: #ffb84d;
+  font-weight: 700;
+}
+
+.point-suggestion li::before {
+  content: '→';
+  color: var(--accent-strong);
+}
+
+.narrative {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+@media (max-width: 520px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* ---------- Match grid ---------- */
 .match-list {
   list-style: none;

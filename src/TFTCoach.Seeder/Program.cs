@@ -42,7 +42,7 @@ using var lmHttp = new HttpClient { BaseAddress = new Uri(lmStudioUrl.TrimEnd('/
 var contentProvider = new DataDragonService(dataHttp, loggerFactory.CreateLogger<DataDragonService>());
 var inference = new LMStudioClient(lmHttp, embeddingModel, chatModel: embeddingModel, loggerFactory.CreateLogger<LMStudioClient>());
 var repository = new SupabaseVectorRepository(
-    NpgsqlConnectionString.FromUrl(dbUrl),
+    NpgsqlConnectionStringFactory.FromUrl(dbUrl),
     loggerFactory.CreateLogger<SupabaseVectorRepository>());
 
 var useCase = new SeedPatchDataUseCase(

@@ -47,37 +47,26 @@ public sealed class RiotMatchClient(
         }
     }
 
-    public async Task<IReadOnlyList<TftMatchResult>> GetRecentMatchesAsync(string puuid, int count, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetRecentMatchIdsAsync(string puuid, int count, CancellationToken cancellationToken = default)
     {
         try
         {
-            var matchIds = await GetMatchIdsAsync(puuid, count, cancellationToken);
-
-            var results = new List<TftMatchResult>(matchIds.Count);
-            foreach (var matchId in matchIds)
-            {
-                var match = await GetMatchAsync(matchId, puuid, cancellationToken);
-                if (match is not null)
-                {
-                    results.Add(match);
-                }
-            }
-
-            return results;
+            return await GetMatchIdsAsync(puuid, count, cancellationToken);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            logger.LogError(ex, "Failed to fetch matches for PUUID {Puuid}", puuid);
+            logger.LogError(ex, "Failed to fetch match ids for PUUID {Puuid}", puuid);
             throw;
         }
     }
 
-    // The Riot ids endpoint returns at most 100 ids per request, so page through
-    // with the start offset until we have the requested count (or run out).
+    // The Riot ids endpoint returns at most 200 ids per request, so page through
+    // with the start offset until we have the requested count (or run out). Pass
+    // int.MaxValue to fetch every available match id.
     private async Task<List<string>> GetMatchIdsAsync(string puuid, int count, CancellationToken cancellationToken)
     {
-        const int pageSize = 100;
-        var ids = new List<string>(count);
+        const int pageSize = 200;
+        var ids = new List<string>(Math.Min(count, pageSize));
         var start = 0;
 
         while (ids.Count < count)
@@ -107,40 +96,56 @@ public sealed class RiotMatchClient(
         return ids;
     }
 
-    private async Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken)
+    public async Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, $"tft/match/v1/matches/{matchId}");
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, matchId, cancellationToken);
-
-        var match = await response.Content.ReadFromJsonAsync<MatchDto>(JsonOptions, cancellationToken);
-        var info = match?.Info;
-        var participant = info?.Participants?.FirstOrDefault(p => p.Puuid == puuid);
-        if (info is null || participant is null)
+        try
         {
-            return null;
+            using var request = CreateRequest(HttpMethod.Get, $"tft/match/v1/matches/{matchId}");
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            await EnsureSuccessAsync(response, matchId, cancellationToken);
+
+            var match = await response.Content.ReadFromJsonAsync<MatchDto>(JsonOptions, cancellationToken);
+            var info = match?.Info;
+            var participant = info?.Participants?.FirstOrDefault(p => p.Puuid == puuid);
+            if (info is null || participant is null)
+            {
+                return null;
+            }
+
+            return new TftMatchResult
+            {
+                MatchId = matchId,
+                PlayedAt = DateTimeOffset.FromUnixTimeMilliseconds(info.GameDatetime),
+                DurationSeconds = info.GameLength,
+                GameVersion = info.GameVersion,
+                Placement = participant.Placement,
+                Level = participant.Level,
+                PlayersEliminated = participant.PlayersEliminated,
+                GoldLeft = participant.GoldLeft,
+                LastRound = participant.LastRound,
+                TotalDamageToPlayers = participant.TotalDamageToPlayers,
+                Traits = participant.Traits?
+                    .Where(t => t.TierCurrent > 0)
+                    .OrderByDescending(t => t.TierCurrent)
+                    .Select(t => $"{t.Name} {t.TierCurrent}")
+                    .ToList() ?? [],
+                Augments = participant.Augments ?? [],
+                Units = participant.Units?
+                    .Where(u => !string.IsNullOrEmpty(u.CharacterId))
+                    .Select(u => new UnitDetail
+                    {
+                        Name = u.CharacterId!,
+                        Tier = u.Tier,
+                        Items = u.ItemNames ?? [],
+                    })
+                    .ToList() ?? [],
+            };
         }
-
-        return new TftMatchResult
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            MatchId = matchId,
-            PlayedAt = DateTimeOffset.FromUnixTimeMilliseconds(info.GameDatetime),
-            DurationSeconds = info.GameLength,
-            GameVersion = info.GameVersion,
-            Placement = participant.Placement,
-            Level = participant.Level,
-            PlayersEliminated = participant.PlayersEliminated,
-            Traits = participant.Traits?
-                .Where(t => t.TierCurrent > 0)
-                .OrderByDescending(t => t.TierCurrent)
-                .Select(t => $"{t.Name} {t.TierCurrent}")
-                .ToList() ?? [],
-            Augments = participant.Augments ?? [],
-            Units = participant.Units?
-                .Select(u => u.CharacterId ?? string.Empty)
-                .Where(id => id.Length > 0)
-                .ToList() ?? [],
-        };
+            logger.LogError(ex, "Failed to fetch match {MatchId} for PUUID {Puuid}", matchId, puuid);
+            throw;
+        }
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
@@ -185,11 +190,17 @@ public sealed class RiotMatchClient(
         int Placement,
         int Level,
         int PlayersEliminated,
+        int GoldLeft,
+        int LastRound,
+        int TotalDamageToPlayers,
         List<string>? Augments,
         List<TraitDto>? Traits,
         List<UnitDto>? Units);
 
     private sealed record TraitDto(string? Name, [property: JsonPropertyName("tier_current")] int TierCurrent);
 
-    private sealed record UnitDto([property: JsonPropertyName("character_id")] string? CharacterId);
+    private sealed record UnitDto(
+        [property: JsonPropertyName("character_id")] string? CharacterId,
+        int Tier,
+        [property: JsonPropertyName("itemNames")] List<string>? ItemNames);
 }

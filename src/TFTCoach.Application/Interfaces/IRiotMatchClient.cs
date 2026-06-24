@@ -13,7 +13,14 @@ public interface IRiotMatchClient
     Task<string> ResolvePuuidAsync(string gameName, string tagLine, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the most recent matches for a PUUID, newest first.
+    /// Returns the most recent match ids for a PUUID, newest first. Cheap relative to
+    /// fetching full match detail, so callers can diff against a cache before pulling details.
     /// </summary>
-    Task<IReadOnlyList<TftMatchResult>> GetRecentMatchesAsync(string puuid, int count, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetRecentMatchIdsAsync(string puuid, int count, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the full detail for a single match from the player's perspective,
+    /// or <c>null</c> if the player did not take part in it.
+    /// </summary>
+    Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken = default);
 }

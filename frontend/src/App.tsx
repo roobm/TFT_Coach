@@ -5,6 +5,7 @@ import {
   type AnalysisResponse,
   type TftMatchResult,
 } from './api';
+import { AnalysisPanel } from './components/AnalysisPanel';
 import { MatchList } from './components/MatchList';
 import { MatchListSkeleton } from './components/MatchListSkeleton';
 import { MatchStats } from './components/MatchStats';
@@ -41,6 +42,7 @@ export default function App() {
   const [riotId, setRiotId] = useState('');
   const [count, setCount] = useState(20);
   const [matches, setMatches] = useState<TftMatchResult[]>([]);
+  const [puuid, setPuuid] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -56,10 +58,12 @@ export default function App() {
     setError(null);
     setAnalysis(null);
     setMatches([]);
+    setPuuid(null);
 
     try {
       const result = await fetchMatchHistory(riotId.trim(), count);
       setMatches(result.matches);
+      setPuuid(result.puuid);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches.');
     } finally {
@@ -72,7 +76,7 @@ export default function App() {
     setError(null);
 
     try {
-      const result = await analyzeMatches(matches);
+      const result = await analyzeMatches(matches, puuid ?? undefined);
       setAnalysis(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze matches.');
@@ -109,9 +113,16 @@ export default function App() {
           aria-label="Number of matches"
           disabled={loadingMatches}
         >
-          {[10, 20, 50, 100, 200].map((n) => (
-            <option key={n} value={n}>
-              {n} games
+          {[
+            { value: 10, label: '10 games' },
+            { value: 20, label: '20 games' },
+            { value: 50, label: '50 games' },
+            { value: 100, label: '100 games' },
+            { value: 200, label: '200 games' },
+            { value: 0, label: 'All games' },
+          ].map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
@@ -158,16 +169,7 @@ export default function App() {
             </button>
           </div>
 
-          {analysis && (
-            <div className="insights">
-              <h3 className="insights-title">
-                <span className="ai-dot" aria-hidden="true" />
-                AI Insights
-                <span className="badge">{analysis.matchesAnalyzed} matches</span>
-              </h3>
-              <pre>{analysis.insights}</pre>
-            </div>
-          )}
+          {analysis && <AnalysisPanel analysis={analysis} />}
 
           <MatchStats matches={matches} />
 
