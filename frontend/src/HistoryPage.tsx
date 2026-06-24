@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import {
-  fetchMatchHistory,
-  fetchRanks,
-  type RankedEntry,
-  type RankSnapshot,
-  type TftMatchResult,
-} from './api';
-import type { AppContext } from './Layout';
+import { fetchMatchHistory, fetchRanks } from './api';
+import type { AppContext, HistoryState } from './Layout';
 import { RankClimbChart } from './components/RankClimbChart';
 
 function SearchIcon() {
@@ -20,13 +14,11 @@ function SearchIcon() {
 }
 
 export function HistoryPage() {
-  const { riotId, setRiotId } = useOutletContext<AppContext>();
-  const [matches, setMatches] = useState<TftMatchResult[]>([]);
-  const [ranks, setRanks] = useState<RankedEntry[] | null>(null);
-  const [history, setHistory] = useState<RankSnapshot[]>([]);
+  const { riotId, setRiotId, historyState, setHistoryState } = useOutletContext<AppContext>();
+  const { matches, ranks, history, searched } = historyState;
+  const update = (patch: Partial<HistoryState>) => setHistoryState((s) => ({ ...s, ...patch }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -37,10 +29,7 @@ export function HistoryPage() {
 
     setLoading(true);
     setError(null);
-    setSearched(true);
-    setMatches([]);
-    setRanks(null);
-    setHistory([]);
+    update({ searched: true, matches: [], ranks: null, history: [] });
 
     // Current-season matches power the estimated line; recorded snapshots add
     // accurate points that accumulate over time.
@@ -48,8 +37,7 @@ export function HistoryPage() {
 
     try {
       const rankResult = await fetchRanks(trimmed);
-      setRanks(rankResult.entries);
-      setHistory(rankResult.history);
+      update({ ranks: rankResult.entries, history: rankResult.history });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load rank history.');
     } finally {
@@ -57,7 +45,7 @@ export function HistoryPage() {
     }
 
     const matchResult = await matchesPromise;
-    setMatches(matchResult?.matches ?? []);
+    update({ matches: matchResult?.matches ?? [] });
   }
 
   const ranked = ranks?.find((entry) => entry.queueType === 'RANKED_TFT');

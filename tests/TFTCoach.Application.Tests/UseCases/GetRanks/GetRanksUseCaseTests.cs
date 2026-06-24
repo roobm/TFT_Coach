@@ -118,6 +118,9 @@ public class GetRanksUseCaseTests
 
         public Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken = default)
             => Task.FromResult<TftMatchResult?>(null);
+
+        public Task<IReadOnlyList<TftMatchResult>> GetMatchParticipantsAsync(string matchId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
     }
 
     private sealed class FakeRiotLeagueClient(IReadOnlyList<RankedEntry> entries) : IRiotLeagueClient
@@ -129,6 +132,9 @@ public class GetRanksUseCaseTests
             RequestedPuuid = puuid;
             return Task.FromResult(entries);
         }
+
+        public Task<IReadOnlyList<string>> GetChallengerPuuidsAsync(int maxPlayers, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>([]);
     }
 
     private sealed class RecordingRankHistoryRepository : IRankHistoryRepository

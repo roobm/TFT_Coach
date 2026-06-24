@@ -50,6 +50,34 @@ public sealed class RiotLeagueClient(
         }
     }
 
+    public async Task<IReadOnlyList<string>> GetChallengerPuuidsAsync(int maxPlayers, CancellationToken cancellationToken = default)
+    {
+        if (maxPlayers <= 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Get, "tft/league/v1/challenger?queue=RANKED_TFT");
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            await EnsureSuccessAsync(response, "challenger", cancellationToken);
+
+            var league = await response.Content.ReadFromJsonAsync<LeagueListDto>(JsonOptions, cancellationToken);
+            return league?.Entries?
+                .Where(e => !string.IsNullOrEmpty(e.Puuid))
+                .OrderByDescending(e => e.LeaguePoints)
+                .Take(maxPlayers)
+                .Select(e => e.Puuid!)
+                .ToList() ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogError(ex, "Failed to fetch challenger ladder");
+            throw;
+        }
+    }
+
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
     {
         var request = new HttpRequestMessage(method, relativeUrl);
@@ -85,4 +113,11 @@ public sealed class RiotLeagueClient(
         [property: JsonPropertyName("wins")] int Wins,
         [property: JsonPropertyName("losses")] int Losses,
         [property: JsonPropertyName("hotStreak")] bool HotStreak);
+
+    private sealed record LeagueListDto(
+        [property: JsonPropertyName("entries")] List<LeagueListEntryDto>? Entries);
+
+    private sealed record LeagueListEntryDto(
+        [property: JsonPropertyName("puuid")] string? Puuid,
+        [property: JsonPropertyName("leaguePoints")] int LeaguePoints);
 }

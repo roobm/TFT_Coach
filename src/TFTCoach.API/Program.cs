@@ -1,11 +1,14 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using TFTCoach.API.Hubs;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.GetMatchHistory;
 using TFTCoach.Application.UseCases.GetRanks;
+using TFTCoach.Application.UseCases.GetSuggestion;
 using TFTCoach.Domain.Interfaces;
 using TFTCoach.Infrastructure.InferenceService;
+using TFTCoach.Infrastructure.Meta;
 using TFTCoach.Infrastructure.Persistence;
 using TFTCoach.Infrastructure.RiotApi;
 
@@ -27,8 +30,17 @@ var supabaseDbUrl = Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
     ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 var dbConnectionString = NpgsqlConnectionStringFactory.FromUrl(supabaseDbUrl);
 
+// AllowCredentials is required for the SignalR browser client to negotiate a
+// cross-origin connection; the origin is already pinned to the frontend.
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicy, policy =>
-    policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod()));
+    policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+
+// SignalR uses its own JSON protocol, so register the string-enum converter here
+// too — otherwise SuggestionCategory would serialise as an integer to the client.
+// Detailed errors are enabled: this is a local-first dev app with no remote clients.
+builder.Services.AddSignalR(options => options.EnableDetailedErrors = true)
+    .AddJsonProtocol(options =>
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // Serialize enums (e.g. PlacementTrend) as their string names so the typed
 // frontend contract receives "Stable"/"Improving"/"Declining", not integers.
@@ -91,6 +103,68 @@ builder.Services.AddScoped<IRankHistoryRepository>(sp =>
 builder.Services.AddScoped<GetMatchHistoryUseCase>();
 builder.Services.AddScoped<AnalyzeMatchHistoryUseCase>();
 builder.Services.AddScoped<GetRanksUseCase>();
+builder.Services.AddScoped<GetSuggestionUseCase>();
+
+// Current meta for grounding live coaching. Primary source is the live Riot
+// ladder (RiotMetaProvider, computed from top KR Challenger matches); a curated
+// patch-tagged JSON file is the resilient fallback when Riot is unavailable.
+var metaFilePath = Environment.GetEnvironmentVariable("META_FILE_PATH")
+    ?? Path.Combine(AppContext.BaseDirectory, "data", "meta", "current.json");
+
+// The meta is sampled from a fixed high-elo ladder (KR by default) regardless of
+// the player's own region, so it uses its own routing hosts.
+var metaPlatform = Environment.GetEnvironmentVariable("META_PLATFORM") ?? "kr";
+var metaRegion = Environment.GetEnvironmentVariable("META_REGION") ?? "asia";
+
+builder.Services.AddHttpClient("RiotMetaLeagueClient", client =>
+{
+    client.BaseAddress = new Uri($"https://{metaPlatform}.api.riotgames.com/");
+    client.Timeout = TimeSpan.FromMinutes(2);
+})
+    .AddHttpMessageHandler<RiotRateLimitHandler>();
+builder.Services.AddHttpClient("RiotMetaMatchClient", client =>
+{
+    client.BaseAddress = new Uri($"https://{metaRegion}.api.riotgames.com/");
+    client.Timeout = TimeSpan.FromMinutes(10);
+})
+    .AddHttpMessageHandler<RiotRateLimitHandler>();
+
+builder.Services.AddSingleton<IMetaProvider>(sp =>
+{
+    var fallback = new FileMetaProvider(metaFilePath, sp.GetRequiredService<ILogger<FileMetaProvider>>());
+
+    if (string.IsNullOrWhiteSpace(riotApiKey))
+    {
+        // No Riot key: serve the curated file only.
+        return fallback;
+    }
+
+    var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var leagueClient = new RiotLeagueClient(
+        httpFactory.CreateClient("RiotMetaLeagueClient"), riotApiKey, sp.GetRequiredService<ILogger<RiotLeagueClient>>());
+    var matchClient = new RiotMatchClient(
+        httpFactory.CreateClient("RiotMetaMatchClient"), riotApiKey, sp.GetRequiredService<ILogger<RiotMatchClient>>());
+
+    // Sample size is env-tunable. Bigger = more accurate tiers but a longer warm-up,
+    // because each Riot call is throttled to the dev-key limit (100 req / 2 min).
+    var defaults = new RiotMetaOptions();
+    var metaOptions = new RiotMetaOptions
+    {
+        MaxPlayers = EnvInt("META_MAX_PLAYERS", defaults.MaxPlayers),
+        MatchesPerPlayer = EnvInt("META_MATCHES_PER_PLAYER", defaults.MatchesPerPlayer),
+        MinSampleSize = EnvInt("META_MIN_SAMPLE", defaults.MinSampleSize),
+        TopComps = EnvInt("META_TOP_COMPS", defaults.TopComps),
+    };
+
+    // Persist computed snapshots (grouped by set) so a restart serves the last
+    // known meta instantly instead of recomputing from the ladder. Best-effort:
+    // the provider degrades gracefully if the DB is unavailable.
+    var metaCache = new SupabaseMetaCacheRepository(
+        dbConnectionString, sp.GetRequiredService<ILogger<SupabaseMetaCacheRepository>>());
+
+    return new RiotMetaProvider(
+        leagueClient, matchClient, fallback, sp.GetRequiredService<ILogger<RiotMetaProvider>>(), metaOptions, metaCache);
+});
 
 var app = builder.Build();
 app.UseCors(CorsPolicy);
@@ -154,10 +228,18 @@ app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, Cancellation
     }
 });
 
+// SignalR hub for live, real-time coaching suggestions.
+app.MapHub<CoachHub>("/hubs/coach");
+
 app.Run();
 
-static bool TryParseRiotId(string? riotId, out string gameName, out string tagLine)
+static int EnvInt(string name, int fallback)
 {
+    var raw = Environment.GetEnvironmentVariable(name);
+    return int.TryParse(raw, out var value) && value > 0 ? value : fallback;
+}
+
+static bool TryParseRiotId(string? riotId, out string gameName, out string tagLine){
     gameName = string.Empty;
     tagLine = string.Empty;
     if (string.IsNullOrWhiteSpace(riotId))

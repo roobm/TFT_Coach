@@ -240,6 +240,9 @@ public class GetMatchHistoryUseCaseTests
             var set = setByMatchId is not null && setByMatchId.TryGetValue(matchId, out var s) ? s : 15;
             return Task.FromResult<TftMatchResult?>(new TftMatchResult { MatchId = matchId, Placement = 8, SetNumber = set });
         }
+
+        public Task<IReadOnlyList<TftMatchResult>> GetMatchParticipantsAsync(string matchId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
     }
 
     private sealed class RecordingMatchHistoryRepository : IMatchHistoryRepository

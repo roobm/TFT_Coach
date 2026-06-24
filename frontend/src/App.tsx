@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import {
-  analyzeMatches,
-  fetchMatchHistory,
-  fetchRanks,
-  type AnalysisResponse,
-  type RankedEntry,
-  type RankSnapshot,
-  type TftMatchResult,
-} from './api';
-import type { AppContext } from './Layout';
+import { analyzeMatches, fetchMatchHistory, fetchRanks } from './api';
+import type { AppContext, MatchesState } from './Layout';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { MatchList } from './components/MatchList';
 import { MatchListSkeleton } from './components/MatchListSkeleton';
@@ -49,17 +41,10 @@ function EmptyIcon() {
 }
 
 export default function App() {
-  const { riotId, setRiotId } = useOutletContext<AppContext>();
-  const [count, setCount] = useState(20);
-  const [season, setSeason] = useState(0); // 0 = current season
-  const [currentSet, setCurrentSet] = useState(0);
-  const [resultSet, setResultSet] = useState(0);
-  const [matches, setMatches] = useState<TftMatchResult[]>([]);
-  const [puuid, setPuuid] = useState<string | null>(null);
-  const [ranks, setRanks] = useState<RankedEntry[] | null>(null);
-  const [rankHistory, setRankHistory] = useState<RankSnapshot[]>([]);
-  const [searchedRiotId, setSearchedRiotId] = useState('');
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const { riotId, setRiotId, matchesState, setMatchesState } = useOutletContext<AppContext>();
+  const { count, season, currentSet, resultSet, matches, puuid, ranks, rankHistory, searchedRiotId, analysis } =
+    matchesState;
+  const update = (patch: Partial<MatchesState>) => setMatchesState((s) => ({ ...s, ...patch }));
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,22 +57,26 @@ export default function App() {
 
     setLoadingMatches(true);
     setError(null);
-    setAnalysis(null);
-    setMatches([]);
-    setPuuid(null);
-    setRanks(null);
-    setRankHistory([]);
-    setSearchedRiotId(trimmed);
+    update({
+      analysis: null,
+      matches: [],
+      puuid: null,
+      ranks: null,
+      rankHistory: [],
+      searchedRiotId: trimmed,
+    });
 
     // Ranks are a cheap, independent call — fetch them alongside match history.
     const ranksPromise = fetchRanks(trimmed).catch(() => null);
 
     try {
       const result = await fetchMatchHistory(trimmed, nextCount, nextSeason);
-      setMatches(result.matches);
-      setPuuid(result.puuid);
-      setCurrentSet(result.currentSet);
-      setResultSet(result.set);
+      update({
+        matches: result.matches,
+        puuid: result.puuid,
+        currentSet: result.currentSet,
+        resultSet: result.set,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches.');
     } finally {
@@ -95,8 +84,7 @@ export default function App() {
     }
 
     const rankResult = await ranksPromise;
-    setRanks(rankResult?.entries ?? null);
-    setRankHistory(rankResult?.history ?? []);
+    update({ ranks: rankResult?.entries ?? null, rankHistory: rankResult?.history ?? [] });
   }
 
   function handleSearch(event: React.FormEvent) {
@@ -106,7 +94,7 @@ export default function App() {
 
   // Switching season is an explicit "show me that season" action — load it now.
   function handleSeasonChange(nextSeason: number) {
-    setSeason(nextSeason);
+    update({ season: nextSeason });
     if (searchedRiotId.length > 0) {
       void runSearch(count, nextSeason);
     }
@@ -118,7 +106,7 @@ export default function App() {
 
     try {
       const result = await analyzeMatches(matches, puuid ?? undefined);
-      setAnalysis(result);
+      update({ analysis: result });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze matches.');
     } finally {
@@ -157,7 +145,7 @@ export default function App() {
         <select
           className="count-select"
           value={count}
-          onChange={(e) => setCount(Number(e.target.value))}
+          onChange={(e) => update({ count: Number(e.target.value) })}
           aria-label="Number of matches"
           disabled={loadingMatches}
         >

@@ -1,0 +1,4 @@
+{
+  "_comment": "Intentionally empty. The live RiotMetaProvider computes the current meta from the Riot Challenger ladder; this file is only a cold-start fallback. Leaving it without `set`/`patch`/`comps` makes FileMetaProvider return no meta, so the UI shows 'no comps yet' instead of stale data. To pin a curated meta, add `set`, `patch`, and a `comps` list here.",
+  "comps": []
+}
