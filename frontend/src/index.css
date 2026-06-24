@@ -2008,3 +2008,42 @@ button:disabled {
   color: #fff;
   cursor: pointer;
 }
+
+/* ---------- Team code → board units ---------- */
+.teamcode-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.teamcode-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.teamcode-btn {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.teamcode-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.teamcode-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.teamcode-msg {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
