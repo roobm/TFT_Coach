@@ -97,8 +97,8 @@ app.UseCors(CorsPolicy);
 
 app.MapGet("/", () => "TFT Coach API");
 
-// GET /matches?riotId=Name%23TAG&count=10
-app.MapGet("/matches", async (string riotId, int? count, GetMatchHistoryUseCase useCase, CancellationToken ct) =>
+// GET /matches?riotId=Name%23TAG&count=10&set=17
+app.MapGet("/matches", async (string riotId, int? count, int? set, GetMatchHistoryUseCase useCase, CancellationToken ct) =>
 {
     if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
     {
@@ -112,6 +112,7 @@ app.MapGet("/matches", async (string riotId, int? count, GetMatchHistoryUseCase 
             GameName = gameName,
             TagLine = tagLine,
             Count = count ?? 10,
+            Set = set ?? 0,
         }, ct);
 
         return Results.Ok(response);

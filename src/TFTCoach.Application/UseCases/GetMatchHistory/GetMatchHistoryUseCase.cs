@@ -23,8 +23,13 @@ public sealed class GetMatchHistoryUseCase(
         // player's match ids. A positive count is clamped to a single page request.
         var count = request.Count <= 0 ? int.MaxValue : Math.Clamp(request.Count, 1, 200);
 
+        // When a specific season is requested we must page through every match id
+        // (the target set may be far older than the newest games); otherwise the
+        // newest `count` ids already cover the current set.
+        var idFetchCount = request.Set > 0 ? int.MaxValue : count;
+
         var puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
-        var matchIds = await riotClient.GetRecentMatchIdsAsync(puuid, count, cancellationToken);
+        var matchIds = await riotClient.GetRecentMatchIdsAsync(puuid, idFetchCount, cancellationToken);
         if (matchIds.Count == 0)
         {
             return new GetMatchHistoryResponse { Puuid = puuid, Matches = [] };
@@ -32,12 +37,14 @@ public sealed class GetMatchHistoryUseCase(
 
         var cached = await LoadCachedAsync(puuid, matchIds, cancellationToken);
 
-        // Walk matches newest-first, fetching detail only for ids we have not stored.
-        // Riot returns ids in reverse-chronological order, so once we reach a match
-        // from an older TFT set we can stop: everything beyond it is a previous season.
-        // This keeps results scoped to the current set and avoids re-fetching the
-        // player's entire (multi-season) history from the throttled Riot API.
+        // Riot returns ids newest-first, but a match's set is only known after we
+        // load its detail. The current set is the newest match's set; the target
+        // set is either an explicitly requested season or the current one. We walk
+        // newest→oldest, skipping newer sets and stopping once we pass below the
+        // target, so we never re-fetch the player's entire multi-season history
+        // unless they explicitly ask for an old season.
         var currentSet = await ResolveCurrentSetAsync(puuid, matchIds, cached, cancellationToken);
+        var targetSet = request.Set > 0 ? request.Set : currentSet;
 
         var fetched = new List<TftMatchResult>();
         var matches = new List<TftMatchResult>();
@@ -55,12 +62,19 @@ public sealed class GetMatchHistoryUseCase(
                 cached[matchId] = match;
             }
 
-            // Stop at the first match we can confidently place in an earlier set.
-            // Matches with an unknown set (0) are kept — legacy cached rows have no
-            // set recorded yet and are, in practice, current-season games.
-            if (currentSet > 0 && match.SetNumber > 0 && match.SetNumber != currentSet)
+            // Legacy cached rows have no set recorded (0); treat them as current-season.
+            var effectiveSet = match.SetNumber == 0 ? currentSet : match.SetNumber;
+            if (targetSet > 0 && effectiveSet > 0)
             {
-                break;
+                if (effectiveSet > targetSet)
+                {
+                    continue; // newer than the target season — skip it.
+                }
+
+                if (effectiveSet < targetSet)
+                {
+                    break; // reached an older season — everything beyond is older too.
+                }
             }
 
             matches.Add(match);
@@ -74,12 +88,14 @@ public sealed class GetMatchHistoryUseCase(
 
         logger.LogInformation(
             "Returned {Total} set-{Set} matches for {GameName}#{TagLine} ({Fetched} from Riot)",
-            matches.Count, currentSet, request.GameName, request.TagLine, fetched.Count);
+            matches.Count, targetSet, request.GameName, request.TagLine, fetched.Count);
 
         return new GetMatchHistoryResponse
         {
             Puuid = puuid,
             Matches = matches,
+            CurrentSet = currentSet,
+            Set = targetSet,
         };
     }
 
