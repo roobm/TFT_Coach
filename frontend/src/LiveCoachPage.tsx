@@ -8,6 +8,9 @@ import {
   type GameState,
   type MetaInfo,
 } from './coachHub';
+import { CalibrationOverlay } from './screen/CalibrationOverlay';
+import { useScreenReader } from './screen/useScreenReader';
+import type { OcrGameStatePartial } from './screen/parse';
 
 // One unit/item per line or comma-separated — split into a clean list.
 function toList(value: string): string[] {
@@ -36,6 +39,18 @@ export function LiveCoachPage() {
   const [suggestion, setSuggestion] = useState<CoachingSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Screen reader auto-fills the numeric fields from the player's own shared
+  // window. It never submits — the player still presses "Get suggestion".
+  function applySnapshot(partial: OcrGameStatePartial) {
+    if (partial.stage !== undefined) setStage(partial.stage);
+    if (partial.gold !== undefined) setGold(partial.gold);
+    if (partial.level !== undefined) setLevel(partial.level);
+    if (partial.health !== undefined) setHealth(partial.health);
+  }
+
+  const reader = useScreenReader(applySnapshot);
+  const reading = reader.status === 'reading' || reader.status === 'starting';
 
   // Open/close the live connection as the coach is toggled, and load the meta
   // the coach is grounded on once connected.
@@ -139,6 +154,41 @@ export function LiveCoachPage() {
         </div>
       </div>
 
+      <div className="ocr-bar">
+        <div className="ocr-bar-controls">
+          {reading ? (
+            <button type="button" className="ocr-btn ocr-stop" onClick={reader.stop}>
+              Stop reading
+            </button>
+          ) : (
+            <button type="button" className="ocr-btn ocr-start" onClick={() => void reader.start()}>
+              Read my screen
+            </button>
+          )}
+          <button type="button" className="ocr-btn ocr-cal" onClick={() => void reader.openCalibration()}>
+            Calibrate
+          </button>
+        </div>
+        <div className="ocr-bar-status">
+          {reader.status === 'starting' && <span className="ocr-hint">Starting…</span>}
+          {reader.status === 'reading' && (
+            <span className="ocr-hint ocr-live">
+              <span className="status-dot" aria-hidden="true" />
+              Reading your shared screen
+              {reader.lastUpdated && (
+                <em> · updated {new Date(reader.lastUpdated).toLocaleTimeString()}</em>
+              )}
+            </span>
+          )}
+          {reader.status === 'idle' && (
+            <span className="ocr-hint ocr-muted">
+              Auto-fills gold, level, stage &amp; health from a window you share. Advisory only.
+            </span>
+          )}
+          {reader.error && <span className="ocr-hint ocr-error">{reader.error}</span>}
+        </div>
+      </div>
+
       <form className="coach-form" onSubmit={handleSubmit}>
         <fieldset className="coach-fieldset" disabled={!online}>
           <div className="coach-grid">
@@ -239,6 +289,15 @@ export function LiveCoachPage() {
               : 'Toggle the coach online when you load into a game to start getting live suggestions.'}
           </p>
         </div>
+      )}
+
+      {reader.calibrationFrame && (
+        <CalibrationOverlay
+          frameDataUrl={reader.calibrationFrame}
+          initialRegions={reader.regions}
+          onSave={reader.saveCalibration}
+          onCancel={reader.cancelCalibration}
+        />
       )}
     </>
   );

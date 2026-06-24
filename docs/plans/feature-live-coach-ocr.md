@@ -100,3 +100,19 @@ that can feed the same fields.
   auto-fill and stay roughly in sync while playing.
 - Fields remain manually editable; suggestion still triggered by the player.
 - Parsing/validation unit tests pass; `npm run build` clean.
+
+## Status — v1 implemented
+- Branch `feature/live-coach-ocr`.
+- Modules under `frontend/src/screen/`: `regions.ts`, `parse.ts` (+ `parse.test.ts`),
+  `capture.ts`, `ocr.ts`, `reader.ts`, `useScreenReader.ts`, `CalibrationOverlay.tsx`.
+- `LiveCoachPage.tsx` gets a "Read my screen" / "Stop reading" + "Calibrate" bar
+  that feeds `gold/level/stage/health` into the existing form state.
+- 11 vitest parsing tests pass; `npm run build` clean; UI verified in browser.
+
+### Known follow-ups
+- **Tesseract assets**: Tesseract.js fetches its worker/core/traineddata at runtime
+  from a CDN by default — a deviation from strict local-first. Bundle/self-host the
+  worker + `eng.traineddata` for full offline use (follow-up).
+- Units/items recognition, streak detection, and the native macOS sidecar (Track B)
+  remain future work.
+
