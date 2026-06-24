@@ -213,14 +213,138 @@ public class AnalyzeMatchHistoryUseCaseTests
         Assert.Contains("Sorcerers were buffed this patch.", inference.LastUserMessage);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldGroundPromptInMeta_WhenProviderReturnsMetaWithComps()
+    {
+        // Arrange
+        var inference = new FakeInferenceClient("""{ "narrative": "ok" }""");
+        var useCase = NewUseCase(inference, metaProvider: new FakeMetaProvider(SampleMeta()));
+        var matches = new List<TftMatchResult>
+        {
+            new() { MatchId = "1", Placement = 2, Traits = ["Sorcerer 4"] },
+        };
+
+        // Act
+        await useCase.ExecuteAsync(new AnalyzeMatchHistoryRequest { Matches = matches });
+
+        // Assert
+        Assert.Contains("Current meta (Set 14: Cyber City, patch 14.6)", inference.LastUserMessage);
+        Assert.Contains("Cypher Vanguard", inference.LastUserMessage);
+        Assert.Contains("Meta fit", inference.LastUserMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldOmitMetaSection_WhenProviderReturnsNull()
+    {
+        // Arrange
+        var inference = new FakeInferenceClient("""{ "narrative": "ok" }""");
+        var useCase = NewUseCase(inference, metaProvider: new FakeMetaProvider(null));
+        var matches = new List<TftMatchResult>
+        {
+            new() { MatchId = "1", Placement = 2, Traits = ["Sorcerer 4"] },
+        };
+
+        // Act
+        await useCase.ExecuteAsync(new AnalyzeMatchHistoryRequest { Matches = matches });
+
+        // Assert
+        Assert.DoesNotContain("Current meta", inference.LastUserMessage);
+        Assert.DoesNotContain("Meta fit", inference.LastUserMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldStillSucceed_WhenMetaProviderThrows()
+    {
+        // Arrange — meta grounding is best-effort and must not fail the analysis.
+        var inference = new FakeInferenceClient("""{ "narrative": "ok" }""");
+        var useCase = NewUseCase(inference, metaProvider: new ThrowingMetaProvider());
+        var matches = new List<TftMatchResult>
+        {
+            new() { MatchId = "1", Placement = 2, Traits = ["Sorcerer 4"] },
+        };
+
+        // Act
+        var response = await useCase.ExecuteAsync(new AnalyzeMatchHistoryRequest { Matches = matches });
+
+        // Assert
+        Assert.Equal(1, response.MatchesAnalyzed);
+        Assert.DoesNotContain("Current meta", inference.LastUserMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldNameClosestMetaComp_WhenTopCompOverlapsMetaComp()
+    {
+        // Arrange — the player's Cypher comp fields Aphelios, a Cypher Vanguard carry.
+        var inference = new FakeInferenceClient("""{ "narrative": "ok" }""");
+        var useCase = NewUseCase(inference, metaProvider: new FakeMetaProvider(SampleMeta()));
+        var matches = new List<TftMatchResult>
+        {
+            new()
+            {
+                MatchId = "1",
+                Placement = 2,
+                Traits = ["Cypher 4"],
+                Units = [new UnitDetail { Name = "TFT14_Aphelios", Tier = 2 }],
+            },
+        };
+
+        // Act
+        await useCase.ExecuteAsync(new AnalyzeMatchHistoryRequest { Matches = matches });
+
+        // Assert
+        Assert.Contains("most closely matches Cypher Vanguard", inference.LastUserMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldFlagOffMeta_WhenTopCompMatchesNoMetaComp()
+    {
+        // Arrange — the player's comp shares nothing with the listed meta comp.
+        var inference = new FakeInferenceClient("""{ "narrative": "ok" }""");
+        var useCase = NewUseCase(inference, metaProvider: new FakeMetaProvider(SampleMeta()));
+        var matches = new List<TftMatchResult>
+        {
+            new()
+            {
+                MatchId = "1",
+                Placement = 5,
+                Traits = ["Brawler 2"],
+                Units = [new UnitDetail { Name = "TFT14_Garen", Tier = 2 }],
+            },
+        };
+
+        // Act
+        await useCase.ExecuteAsync(new AnalyzeMatchHistoryRequest { Matches = matches });
+
+        // Assert
+        Assert.Contains("it is off-meta", inference.LastUserMessage);
+    }
+
+    private static MetaSnapshot SampleMeta() => new()
+    {
+        Set = "Set 14: Cyber City",
+        Patch = "14.6",
+        Comps =
+        [
+            new MetaComp
+            {
+                Name = "Cypher Vanguard",
+                Tier = "S",
+                Carries = ["Aphelios", "Jinx"],
+                KeyItems = ["Guinsoo's Rageblade"],
+            },
+        ],
+    };
+
     private static AnalyzeMatchHistoryUseCase NewUseCase(
         ILMStudioClient inference,
         IVectorRepository? vectorRepo = null,
-        IMatchHistoryRepository? matchRepo = null)
+        IMatchHistoryRepository? matchRepo = null,
+        IMetaProvider? metaProvider = null)
         => new(
             inference,
             vectorRepo ?? new StubVectorRepository([]),
             matchRepo ?? new RecordingMatchHistoryRepository(),
+            metaProvider ?? new FakeMetaProvider(null),
             NullLogger<AnalyzeMatchHistoryUseCase>.Instance);
 
     private sealed class FakeInferenceClient(string completion) : ILMStudioClient
@@ -277,5 +401,17 @@ public class AnalyzeMatchHistoryUseCaseTests
 
         public Task<IReadOnlyList<TftMatchResult>> GetByMatchIdsAsync(string puuid, IReadOnlyList<string> matchIds, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<TftMatchResult>>([]);
+    }
+
+    private sealed class FakeMetaProvider(MetaSnapshot? meta) : IMetaProvider
+    {
+        public Task<MetaSnapshot?> GetCurrentMetaAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(meta);
+    }
+
+    private sealed class ThrowingMetaProvider : IMetaProvider
+    {
+        public Task<MetaSnapshot?> GetCurrentMetaAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("meta source down");
     }
 }

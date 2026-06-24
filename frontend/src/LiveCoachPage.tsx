@@ -344,7 +344,14 @@ export function LiveCoachPage() {
           <span className={`suggestion-tag ${suggestion.category.toLowerCase()}`}>
             {suggestion.category.toUpperCase()}
           </span>
-          <p className="suggestion-text">{suggestion.text}</p>
+          <ul className="suggestion-list">
+            {suggestion.text
+              .split('\n')
+              .filter((line) => line.trim().length > 0)
+              .map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+          </ul>
         </section>
       )}
 
