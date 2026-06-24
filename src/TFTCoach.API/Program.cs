@@ -162,8 +162,15 @@ builder.Services.AddSingleton<IMetaProvider>(sp =>
     var metaCache = new SupabaseMetaCacheRepository(
         dbConnectionString, sp.GetRequiredService<ILogger<SupabaseMetaCacheRepository>>());
 
+    // Resolves raw Riot ids (TFT_Item_*, TFT14_*) to in-game display names so comps
+    // read correctly. Reuses the Community Dragon static-data file; degrades to an
+    // id-cleanup fallback if it can't be fetched.
+    var staticData = new CommunityDragonStaticData(
+        httpFactory.CreateClient(), sp.GetRequiredService<ILogger<CommunityDragonStaticData>>());
+
     return new RiotMetaProvider(
-        leagueClient, matchClient, fallback, sp.GetRequiredService<ILogger<RiotMetaProvider>>(), metaOptions, metaCache);
+        leagueClient, matchClient, fallback, sp.GetRequiredService<ILogger<RiotMetaProvider>>(),
+        metaOptions, metaCache, staticData);
 });
 
 var app = builder.Build();

@@ -57,6 +57,7 @@ public sealed class RiotMetaProvider : IMetaProvider
     private readonly IRiotMatchClient matchClient;
     private readonly IMetaProvider fallback;
     private readonly IMetaCacheRepository? cache;
+    private readonly ITftStaticData? staticData;
     private readonly ILogger<RiotMetaProvider> logger;
     private readonly RiotMetaOptions options;
     private readonly SemaphoreSlim refreshGate = new(1, 1);
@@ -72,12 +73,14 @@ public sealed class RiotMetaProvider : IMetaProvider
         IMetaProvider fallback,
         ILogger<RiotMetaProvider> logger,
         RiotMetaOptions? options = null,
-        IMetaCacheRepository? cache = null)
+        IMetaCacheRepository? cache = null,
+        ITftStaticData? staticData = null)
     {
         this.leagueClient = leagueClient;
         this.matchClient = matchClient;
         this.fallback = fallback;
         this.cache = cache;
+        this.staticData = staticData;
         this.logger = logger;
         this.options = options ?? new RiotMetaOptions();
     }
@@ -217,6 +220,13 @@ public sealed class RiotMetaProvider : IMetaProvider
             return null;
         }
 
+        // Load static data up front so comp/carry/item names resolve to real display
+        // names instead of raw Riot identifiers.
+        if (staticData is not null)
+        {
+            await staticData.EnsureLoadedAsync(cancellationToken);
+        }
+
         var results = new List<TftMatchResult>();
         var seenMatchIds = new HashSet<string>();
 
@@ -282,8 +292,8 @@ public sealed class RiotMetaProvider : IMetaProvider
                 continue;
             }
 
-            var carryName = carry is null ? "Flex" : CleanName(carry.Name);
-            var traitName = topTrait is null ? "" : CleanName(topTrait);
+            var carryName = carry is null ? "Flex" : ResolveChampion(carry.Name);
+            var traitName = topTrait is null ? "" : ResolveTrait(topTrait);
             var key = $"{traitName}|{carryName}";
 
             if (!groups.TryGetValue(key, out var acc))
@@ -310,13 +320,13 @@ public sealed class RiotMetaProvider : IMetaProvider
             .ToList();
     }
 
-    private static MetaComp ToMetaComp(CompAccumulator acc)
+    private MetaComp ToMetaComp(CompAccumulator acc)
     {
         var name = string.IsNullOrEmpty(acc.Trait) ? acc.Carry : $"{acc.Trait} {acc.Carry}";
         var keyItems = acc.Items
             .OrderByDescending(kv => kv.Value)
             .Take(3)
-            .Select(kv => CleanItemName(kv.Key))
+            .Select(kv => ResolveItem(kv.Key))
             .ToList();
 
         return new MetaComp
@@ -387,6 +397,14 @@ public sealed class RiotMetaProvider : IMetaProvider
         <= 4.8 => "B",
         _ => "C",
     };
+
+    // Resolve raw Riot identifiers to in-game display names via static data, falling
+    // back to a best-effort cleanup when static data is unavailable.
+    private string ResolveChampion(string apiName) => staticData?.Champion(apiName) ?? CleanName(apiName);
+
+    private string ResolveTrait(string apiName) => staticData?.Trait(apiName) ?? CleanName(apiName);
+
+    private string ResolveItem(string apiName) => staticData?.Item(apiName) ?? CleanItemName(apiName);
 
     private static string CleanName(string raw)
     {
