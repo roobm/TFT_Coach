@@ -24,6 +24,8 @@ export interface TftMatchResult {
 export interface MatchHistoryResponse {
   puuid: string;
   matches: TftMatchResult[];
+  currentSet: number;
+  set: number;
 }
 
 export type PlacementTrend = 'Improving' | 'Declining' | 'Stable';
@@ -83,9 +85,12 @@ async function readError(response: Response): Promise<string> {
   return text || `Request failed with status ${response.status}.`;
 }
 
-export async function fetchMatchHistory(riotId: string, count = 10): Promise<MatchHistoryResponse> {
-  const url = `${API_BASE}/matches?riotId=${encodeURIComponent(riotId)}&count=${count}`;
-  const response = await fetch(url);
+export async function fetchMatchHistory(riotId: string, count = 10, set = 0): Promise<MatchHistoryResponse> {
+  const params = new URLSearchParams({ riotId, count: String(count) });
+  if (set > 0) {
+    params.set('set', String(set));
+  }
+  const response = await fetch(`${API_BASE}/matches?${params.toString()}`);
   if (!response.ok) {
     throw new Error(await readError(response));
   }

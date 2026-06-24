@@ -181,6 +181,31 @@ public class GetMatchHistoryUseCaseTests
 
         // Assert — only current-set matches are returned; the older set is excluded.
         Assert.Equal(["M1", "M2"], response.Matches.Select(m => m.MatchId).ToList());
+        Assert.Equal(15, response.CurrentSet);
+        Assert.Equal(15, response.Set);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnRequestedOlderSet_WhenSetSpecified()
+    {
+        // Arrange — M1/M2 current set (15), M3/M4 older (14), M5 older still (13).
+        var sets = new Dictionary<string, int> { ["M1"] = 15, ["M2"] = 15, ["M3"] = 14, ["M4"] = 14, ["M5"] = 13 };
+        var client = new FakeRiotMatchClient("puuid", ["M1", "M2", "M3", "M4", "M5"], sets);
+        var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
+
+        // Act — explicitly request set 14.
+        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        {
+            GameName = "Name",
+            TagLine = "TAG",
+            Count = 0,
+            Set = 14,
+        });
+
+        // Assert — newer set (15) skipped, older set (13) stops the walk.
+        Assert.Equal(["M3", "M4"], response.Matches.Select(m => m.MatchId).ToList());
+        Assert.Equal(14, response.Set);
+        Assert.Equal(15, response.CurrentSet);
     }
 
     private static GetMatchHistoryUseCase NewUseCase(IRiotMatchClient client, IMatchHistoryRepository repo)

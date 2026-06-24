@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   analyzeMatches,
   fetchMatchHistory,
@@ -8,12 +9,16 @@ import {
   type RankSnapshot,
   type TftMatchResult,
 } from './api';
+import type { AppContext } from './Layout';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { MatchList } from './components/MatchList';
 import { MatchListSkeleton } from './components/MatchListSkeleton';
 import { MatchStats } from './components/MatchStats';
 import { RankCard } from './components/RankCard';
 import { RankClimbChart } from './components/RankClimbChart';
+
+// Previous TFT sets offered in the season picker (newest current set minus N).
+const SEASON_LOOKBACK = 6;
 
 function SearchIcon() {
   return (
@@ -44,8 +49,11 @@ function EmptyIcon() {
 }
 
 export default function App() {
-  const [riotId, setRiotId] = useState('');
+  const { riotId, setRiotId } = useOutletContext<AppContext>();
   const [count, setCount] = useState(20);
+  const [season, setSeason] = useState(0); // 0 = current season
+  const [currentSet, setCurrentSet] = useState(0);
+  const [resultSet, setResultSet] = useState(0);
   const [matches, setMatches] = useState<TftMatchResult[]>([]);
   const [puuid, setPuuid] = useState<string | null>(null);
   const [ranks, setRanks] = useState<RankedEntry[] | null>(null);
@@ -56,8 +64,7 @@ export default function App() {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSearch(event: React.FormEvent) {
-    event.preventDefault();
+  async function runSearch(nextCount: number, nextSeason: number) {
     const trimmed = riotId.trim();
     if (trimmed.length === 0) {
       return;
@@ -76,9 +83,11 @@ export default function App() {
     const ranksPromise = fetchRanks(trimmed).catch(() => null);
 
     try {
-      const result = await fetchMatchHistory(trimmed, count);
+      const result = await fetchMatchHistory(trimmed, nextCount, nextSeason);
       setMatches(result.matches);
       setPuuid(result.puuid);
+      setCurrentSet(result.currentSet);
+      setResultSet(result.set);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches.');
     } finally {
@@ -88,6 +97,19 @@ export default function App() {
     const rankResult = await ranksPromise;
     setRanks(rankResult?.entries ?? null);
     setRankHistory(rankResult?.history ?? []);
+  }
+
+  function handleSearch(event: React.FormEvent) {
+    event.preventDefault();
+    void runSearch(count, season);
+  }
+
+  // Switching season is an explicit "show me that season" action — load it now.
+  function handleSeasonChange(nextSeason: number) {
+    setSeason(nextSeason);
+    if (searchedRiotId.length > 0) {
+      void runSearch(count, nextSeason);
+    }
   }
 
   async function handleAnalyze() {
@@ -104,16 +126,10 @@ export default function App() {
     }
   }
 
-  return (
-    <main className="app">
-      <header className="app-header">
-        <span className="brand-mark" aria-hidden="true">TC</span>
-        <div>
-          <h1>TFT Coach</h1>
-          <p className="subtitle">Recent Teamfight Tactics matches with local AI insights.</p>
-        </div>
-      </header>
+  const seasonOptions = buildSeasonOptions(currentSet);
 
+  return (
+    <>
       <form className="search" onSubmit={handleSearch}>
         <div className="search-field">
           <SearchIcon />
@@ -127,6 +143,19 @@ export default function App() {
         </div>
         <select
           className="count-select"
+          value={season}
+          onChange={(e) => handleSeasonChange(Number(e.target.value))}
+          aria-label="Season"
+          disabled={loadingMatches}
+        >
+          {seasonOptions.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="count-select"
           value={count}
           onChange={(e) => setCount(Number(e.target.value))}
           aria-label="Number of matches"
@@ -138,7 +167,7 @@ export default function App() {
             { value: 50, label: '50 games' },
             { value: 100, label: '100 games' },
             { value: 200, label: '200 games' },
-            { value: 0, label: 'All games' },
+            { value: 0, label: 'All this season' },
           ].map(({ value, label }) => (
             <option key={value} value={value}>
               {label}
@@ -174,7 +203,8 @@ export default function App() {
         <section className="results" aria-live="polite">
           <div className="results-header">
             <h2>
-              <span className="count">{matches.length}</span> games played
+              <span className="count">{matches.length}</span> games
+              {resultSet > 0 && <span className="results-season"> · Set {resultSet}</span>}
             </h2>
             <button type="button" onClick={handleAnalyze} disabled={loadingAnalysis}>
               {loadingAnalysis ? (
@@ -213,6 +243,18 @@ export default function App() {
           <p>Search for a Riot ID above to see recent matches and AI insights.</p>
         </div>
       )}
-    </main>
+    </>
   );
+}
+
+// Season picker options: "This season" plus the previous few sets, fetched on
+// demand. Older sets are only known once the current set is resolved by a search.
+function buildSeasonOptions(currentSet: number): { value: number; label: string }[] {
+  const options = [
+    { value: 0, label: currentSet > 0 ? `This season (Set ${currentSet})` : 'This season' },
+  ];
+  for (let set = currentSet - 1; set >= Math.max(1, currentSet - SEASON_LOOKBACK); set--) {
+    options.push({ value: set, label: `Set ${set}` });
+  }
+  return options;
 }
