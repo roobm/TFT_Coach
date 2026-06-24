@@ -13,4 +13,11 @@ public interface IRiotLeagueClient
     /// or an empty list when the player is unranked in every queue.
     /// </summary>
     Task<IReadOnlyList<RankedEntry>> GetRankedEntriesAsync(string puuid, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the PUUIDs of the current Ranked TFT Challenger players, ordered by
+    /// league points (highest first), capped at <paramref name="maxPlayers"/>.
+    /// Used to sample the highest-elo ladder when computing the live meta.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetChallengerPuuidsAsync(int maxPlayers, CancellationToken cancellationToken = default);
 }

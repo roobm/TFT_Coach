@@ -112,36 +112,7 @@ public sealed class RiotMatchClient(
                 return null;
             }
 
-            return new TftMatchResult
-            {
-                MatchId = matchId,
-                PlayedAt = DateTimeOffset.FromUnixTimeMilliseconds(info.GameDatetime),
-                DurationSeconds = info.GameLength,
-                QueueId = info.QueueId,
-                SetNumber = info.TftSetNumber,
-                GameVersion = info.GameVersion,
-                Placement = participant.Placement,
-                Level = participant.Level,
-                PlayersEliminated = participant.PlayersEliminated,
-                GoldLeft = participant.GoldLeft,
-                LastRound = participant.LastRound,
-                TotalDamageToPlayers = participant.TotalDamageToPlayers,
-                Traits = participant.Traits?
-                    .Where(t => t.TierCurrent > 0)
-                    .OrderByDescending(t => t.TierCurrent)
-                    .Select(t => $"{t.Name} {t.TierCurrent}")
-                    .ToList() ?? [],
-                Augments = participant.Augments ?? [],
-                Units = participant.Units?
-                    .Where(u => !string.IsNullOrEmpty(u.CharacterId))
-                    .Select(u => new UnitDetail
-                    {
-                        Name = u.CharacterId!,
-                        Tier = u.Tier,
-                        Items = u.ItemNames ?? [],
-                    })
-                    .ToList() ?? [],
-            };
+            return MapParticipant(matchId, info, participant);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -149,6 +120,64 @@ public sealed class RiotMatchClient(
             throw;
         }
     }
+
+    public async Task<IReadOnlyList<TftMatchResult>> GetMatchParticipantsAsync(string matchId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Get, $"tft/match/v1/matches/{matchId}");
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            await EnsureSuccessAsync(response, matchId, cancellationToken);
+
+            var match = await response.Content.ReadFromJsonAsync<MatchDto>(JsonOptions, cancellationToken);
+            var info = match?.Info;
+            if (info?.Participants is null)
+            {
+                return [];
+            }
+
+            return info.Participants
+                .Select(p => MapParticipant(matchId, info, p))
+                .ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogError(ex, "Failed to fetch participants for match {MatchId}", matchId);
+            throw;
+        }
+    }
+
+    private static TftMatchResult MapParticipant(string matchId, MatchInfoDto info, ParticipantDto participant) =>
+        new()
+        {
+            MatchId = matchId,
+            PlayedAt = DateTimeOffset.FromUnixTimeMilliseconds(info.GameDatetime),
+            DurationSeconds = info.GameLength,
+            QueueId = info.QueueId,
+            SetNumber = info.TftSetNumber,
+            GameVersion = info.GameVersion,
+            Placement = participant.Placement,
+            Level = participant.Level,
+            PlayersEliminated = participant.PlayersEliminated,
+            GoldLeft = participant.GoldLeft,
+            LastRound = participant.LastRound,
+            TotalDamageToPlayers = participant.TotalDamageToPlayers,
+            Traits = participant.Traits?
+                .Where(t => t.TierCurrent > 0)
+                .OrderByDescending(t => t.TierCurrent)
+                .Select(t => $"{t.Name} {t.TierCurrent}")
+                .ToList() ?? [],
+            Augments = participant.Augments ?? [],
+            Units = participant.Units?
+                .Where(u => !string.IsNullOrEmpty(u.CharacterId))
+                .Select(u => new UnitDetail
+                {
+                    Name = u.CharacterId!,
+                    Tier = u.Tier,
+                    Items = u.ItemNames ?? [],
+                })
+                .ToList() ?? [],
+        };
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
     {

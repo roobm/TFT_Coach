@@ -23,4 +23,11 @@ public interface IRiotMatchClient
     /// or <c>null</c> if the player did not take part in it.
     /// </summary>
     Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every participant's board in a match (placements 1-8), so callers can
+    /// aggregate a whole lobby rather than a single player. Used when computing the
+    /// live meta from sampled ladder games.
+    /// </summary>
+    Task<IReadOnlyList<TftMatchResult>> GetMatchParticipantsAsync(string matchId, CancellationToken cancellationToken = default);
 }

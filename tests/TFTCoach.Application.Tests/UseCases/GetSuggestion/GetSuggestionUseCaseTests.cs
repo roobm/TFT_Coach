@@ -105,13 +105,60 @@ public class GetSuggestionUseCaseTests
         Assert.Contains("Contested by the player to my left.", inference.LastUserMessage);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldGroundPromptInMeta_WhenMetaAvailable()
+    {
+        // Arrange
+        var inference = new FakeInferenceClient("[COMP] Commit to Cypher Vanguard.");
+        var meta = new MetaSnapshot
+        {
+            Set = "Set 14: Cyber City",
+            Patch = "14.6",
+            Comps =
+            [
+                new MetaComp
+                {
+                    Name = "Cypher Vanguard",
+                    Tier = "S",
+                    Carries = ["Aphelios"],
+                    KeyItems = ["Guinsoo's Rageblade"],
+                },
+            ],
+        };
+        var useCase = NewUseCase(inference, new FakeMetaProvider(meta));
+
+        // Act
+        await useCase.ExecuteAsync(NewRequest());
+
+        // Assert
+        Assert.Contains("14.6", inference.LastUserMessage);
+        Assert.Contains("Cypher Vanguard", inference.LastUserMessage);
+        Assert.Contains("Guinsoo's Rageblade", inference.LastUserMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldOmitMetaSection_WhenNoMetaAvailable()
+    {
+        // Arrange
+        var inference = new FakeInferenceClient("[ECONOMY] Hold for interest.");
+        var useCase = NewUseCase(inference, new FakeMetaProvider(null));
+
+        // Act
+        await useCase.ExecuteAsync(NewRequest());
+
+        // Assert
+        Assert.DoesNotContain("Current meta", inference.LastUserMessage);
+    }
+
     private static GetSuggestionRequest NewRequest() => new()
     {
         State = new GameState { Stage = "3-2", Gold = 30, Level = 7, Health = 50 },
     };
 
-    private static GetSuggestionUseCase NewUseCase(ILMStudioClient inference)
-        => new(inference, NullLogger<GetSuggestionUseCase>.Instance);
+    private static GetSuggestionUseCase NewUseCase(
+        ILMStudioClient inference,
+        IMetaProvider? metaProvider = null)
+        => new(inference, metaProvider ?? new FakeMetaProvider(null), NullLogger<GetSuggestionUseCase>.Instance);
 
     private sealed class FakeInferenceClient(string completion) : ILMStudioClient
     {
@@ -125,5 +172,11 @@ public class GetSuggestionUseCaseTests
             LastUserMessage = userMessage;
             return Task.FromResult(completion);
         }
+    }
+
+    private sealed class FakeMetaProvider(MetaSnapshot? meta) : IMetaProvider
+    {
+        public Task<MetaSnapshot?> GetCurrentMetaAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(meta);
     }
 }

@@ -16,8 +16,13 @@ namespace TFTCoach.Application.UseCases.GetSuggestion;
 /// </summary>
 public sealed partial class GetSuggestionUseCase(
     ILMStudioClient inference,
+    IMetaProvider metaProvider,
     ILogger<GetSuggestionUseCase> logger)
 {
+    // Cap how many comps are rendered into the prompt so the meta section stays
+    // compact and the model focuses on the strongest options.
+    private const int MaxMetaComps = 6;
+
     private const string SystemPrompt =
         "You are a Challenger-level Teamfight Tactics coach giving ONE live, in-game suggestion. " +
         "You are given a single snapshot of the player's current board: stage, gold, level, health, " +
@@ -29,6 +34,8 @@ public sealed partial class GetSuggestionUseCase(
         "- After the tag, write at most TWO sentences.\n" +
         "- The first sentence MUST begin with an action verb: Sell, Buy, Roll, Hold, Move, Build, Pivot, or Scout.\n" +
         "- Be concrete and tie the advice to the numbers and units shown. Never invent units, items, or numbers.\n" +
+        "- If a list of current meta compositions is provided, prefer steering the player toward a strong, " +
+        "well-positioned comp from it when it fits their board and items; otherwise advise from first principles.\n" +
         "- Pick the tag that matches the advice: [ECONOMY] gold/interest/leveling, [BOARD] units & positioning, " +
         "[ITEMS] item building/holding, [COMP] which composition to commit or pivot to, [SCOUT] checking opponents.\n\n" +
         "Example: [ECONOMY] Hold at 50 gold and level to 7 next round, then roll. You are healthy enough to greed for interest.";
@@ -37,7 +44,8 @@ public sealed partial class GetSuggestionUseCase(
         GetSuggestionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var userMessage = BuildPrompt(request.State);
+        var meta = await metaProvider.GetCurrentMetaAsync(cancellationToken);
+        var userMessage = BuildPrompt(request.State, meta);
         // Qwen3 hybrid-reasoning soft switch: /no_think must be the last token of the
         // user turn so the model answers directly instead of emitting chain-of-thought.
         var raw = await inference.CompleteAsync(SystemPrompt, userMessage + "\n\n/no_think", cancellationToken);
@@ -54,7 +62,7 @@ public sealed partial class GetSuggestionUseCase(
         };
     }
 
-    private static string BuildPrompt(GameState state)
+    private static string BuildPrompt(GameState state, MetaSnapshot? meta)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Current board snapshot:");
@@ -71,8 +79,46 @@ public sealed partial class GetSuggestionUseCase(
             sb.AppendLine(CultureInfo.InvariantCulture, $"- Player notes: {state.Notes.Trim()}");
         }
 
+        AppendMetaSection(sb, meta);
+
         sb.Append("Give the single highest-impact suggestion for this moment.");
         return sb.ToString();
+    }
+
+    // Renders the current meta as a compact, patch-tagged list the model can
+    // steer toward. Skipped entirely when no meta is available.
+    private static void AppendMetaSection(StringBuilder sb, MetaSnapshot? meta)
+    {
+        if (meta is null || meta.Comps.Count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(CultureInfo.InvariantCulture,
+            $"Current meta ({meta.Set}, patch {meta.Patch}) \u2014 prefer steering toward one of these when it fits:");
+        foreach (var comp in meta.Comps.Take(MaxMetaComps))
+        {
+            var tier = string.IsNullOrWhiteSpace(comp.Tier) ? "" : $" [{comp.Tier.Trim()}]";
+            sb.Append(CultureInfo.InvariantCulture, $"- {comp.Name.Trim()}{tier}:");
+            if (comp.Carries.Count > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $" carries {DisplayList(comp.Carries)};");
+            }
+            if (comp.KeyItems.Count > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $" items {DisplayList(comp.KeyItems)};");
+            }
+            if (!string.IsNullOrWhiteSpace(comp.Playstyle))
+            {
+                sb.Append(CultureInfo.InvariantCulture, $" {comp.Playstyle.Trim()}.");
+            }
+            if (!string.IsNullOrWhiteSpace(comp.Notes))
+            {
+                sb.Append(CultureInfo.InvariantCulture, $" {comp.Notes.Trim()}");
+            }
+            sb.AppendLine();
+        }
     }
 
     private static string Display(string value) =>
