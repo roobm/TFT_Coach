@@ -11,6 +11,7 @@ import {
 import { CalibrationOverlay } from './screen/CalibrationOverlay';
 import { useScreenReader } from './screen/useScreenReader';
 import type { OcrGameStatePartial } from './screen/parse';
+import { decodeTeamCode } from './api';
 
 // One unit/item per line or comma-separated — split into a clean list.
 function toList(value: string): string[] {
@@ -36,6 +37,10 @@ export function LiveCoachPage() {
   const [items, setItems] = useState('');
   const [notes, setNotes] = useState('');
 
+  const [teamCode, setTeamCode] = useState('');
+  const [decoding, setDecoding] = useState(false);
+  const [decodeMsg, setDecodeMsg] = useState<string | null>(null);
+
   const [suggestion, setSuggestion] = useState<CoachingSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +56,29 @@ export function LiveCoachPage() {
 
   const reader = useScreenReader(applySnapshot);
   const reading = reader.status === 'reading' || reader.status === 'starting';
+
+  // Decode a pasted TFT Team Planner code into the board units list.
+  async function handleDecodeTeamCode() {
+    const code = teamCode.trim();
+    if (!code) {
+      return;
+    }
+    setDecoding(true);
+    setDecodeMsg(null);
+    try {
+      const result = await decodeTeamCode(code);
+      if (result.units.length === 0) {
+        setDecodeMsg('No champions found in that code.');
+        return;
+      }
+      setUnits(result.units.map((u) => u.name).join(', '));
+      setDecodeMsg(`Loaded ${result.units.length} units from ${result.set}.`);
+    } catch (err) {
+      setDecodeMsg(err instanceof Error ? err.message : 'Could not decode that team code.');
+    } finally {
+      setDecoding(false);
+    }
+  }
 
   // Open/close the live connection as the coach is toggled, and load the meta
   // the coach is grounded on once connected.
@@ -244,6 +272,24 @@ export function LiveCoachPage() {
           <div className="coach-grid coach-grid-wide">
             <label className="coach-field">
               <span>Board units</span>
+              <div className="teamcode-row">
+                <input
+                  type="text"
+                  className="teamcode-input"
+                  value={teamCode}
+                  onChange={(e) => setTeamCode(e.target.value)}
+                  placeholder="Paste TFT team code, e.g. 0201d00d…TFTSet17"
+                />
+                <button
+                  type="button"
+                  className="teamcode-btn"
+                  onClick={() => void handleDecodeTeamCode()}
+                  disabled={decoding || teamCode.trim().length === 0}
+                >
+                  {decoding ? 'Decoding…' : 'Decode'}
+                </button>
+              </div>
+              {decodeMsg && <span className="teamcode-msg">{decodeMsg}</span>}
               <textarea
                 rows={3}
                 value={units}

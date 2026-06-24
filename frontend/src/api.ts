@@ -120,3 +120,25 @@ export async function fetchRanks(riotId: string): Promise<RanksResponse> {
   }
   return (await response.json()) as RanksResponse;
 }
+
+export interface DecodedUnit {
+  name: string;
+  cost: number;
+}
+
+export interface TeamCodeResponse {
+  set: string;
+  units: DecodedUnit[];
+}
+
+export async function decodeTeamCode(code: string): Promise<TeamCodeResponse> {
+  const response = await fetch(`${API_BASE}/teamcode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  return (await response.json()) as TeamCodeResponse;
+}

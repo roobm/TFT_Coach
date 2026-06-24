@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TFTCoach.API.Hubs;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
+using TFTCoach.Application.UseCases.DecodeTeamCode;
 using TFTCoach.Application.UseCases.GetMatchHistory;
 using TFTCoach.Application.UseCases.GetRanks;
 using TFTCoach.Application.UseCases.GetSuggestion;
@@ -104,6 +105,14 @@ builder.Services.AddScoped<GetMatchHistoryUseCase>();
 builder.Services.AddScoped<AnalyzeMatchHistoryUseCase>();
 builder.Services.AddScoped<GetRanksUseCase>();
 builder.Services.AddScoped<GetSuggestionUseCase>();
+builder.Services.AddScoped<DecodeTeamCodeUseCase>();
+
+// Decodes shareable TFT Team Planner codes into board units using Riot's official
+// team-planner static data (Community Dragon). Cached per set inside the provider.
+builder.Services.AddScoped<ITftTeamPlanner>(sp =>
+    new CommunityDragonTeamPlanner(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient(),
+        sp.GetRequiredService<ILogger<CommunityDragonTeamPlanner>>()));
 
 // Current meta for grounding live coaching. Primary source is the live Riot
 // ladder (RiotMetaProvider, computed from top KR Challenger matches); a curated
@@ -209,6 +218,20 @@ app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, Anal
 {
     var response = await useCase.ExecuteAsync(request, ct);
     return Results.Ok(response);
+});
+
+// POST /teamcode  { "code": "0201d0...TFTSet17" }
+app.MapPost("/teamcode", async (DecodeTeamCodeRequest request, DecodeTeamCodeUseCase useCase, CancellationToken ct) =>
+{
+    try
+    {
+        var response = await useCase.ExecuteAsync(request, ct);
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
 });
 
 // GET /ranks?riotId=Name%23TAG
