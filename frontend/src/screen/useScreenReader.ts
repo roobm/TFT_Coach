@@ -3,7 +3,7 @@ import { startCapture, type ScreenCapture } from './capture';
 import { disposeOcr } from './ocr';
 import { readScreenOnce } from './reader';
 import { loadRegions, saveRegions, type OcrRegions } from './regions';
-import type { OcrGameStatePartial } from './parse';
+import type { OcrGameStatePartial, OcrRead } from './parse';
 
 const POLL_MS = 1500;
 
@@ -13,11 +13,15 @@ export interface ScreenReader {
   status: ReaderStatus;
   error: string | null;
   lastUpdated: number | null;
+  /** Raw OCR reads from the last pass, for the diagnostics view. */
+  lastReads: OcrRead[];
   /** A frozen frame for the calibration overlay, or null when not calibrating. */
   calibrationFrame: string | null;
   regions: OcrRegions;
   start: () => Promise<void>;
   stop: () => void;
+  /** Runs a single read immediately (for testing), prompting share if needed. */
+  readNow: () => Promise<void>;
   openCalibration: () => Promise<void>;
   saveCalibration: (regions: OcrRegions) => void;
   cancelCalibration: () => void;
@@ -34,6 +38,7 @@ export function useScreenReader(
   const [status, setStatus] = useState<ReaderStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [lastReads, setLastReads] = useState<OcrRead[]>([]);
   const [calibrationFrame, setCalibrationFrame] = useState<string | null>(null);
   const [regions, setRegions] = useState<OcrRegions>(() => loadRegions());
 
@@ -71,7 +76,8 @@ export function useScreenReader(
     }
     busyRef.current = true;
     try {
-      const partial = await readScreenOnce(capture, regionsRef.current);
+      const { partial, reads } = await readScreenOnce(capture, regionsRef.current);
+      setLastReads(reads);
       if (Object.keys(partial).length > 0) {
         onSnapshotRef.current(partial);
         setLastUpdated(Date.now());
@@ -113,6 +119,23 @@ export function useScreenReader(
       teardown();
     }
   }, [ensureCapture, tick, teardown]);
+
+  const readNow = useCallback(async () => {
+    setError(null);
+    try {
+      const capture = await ensureCapture();
+      // Allow a frame to render before reading.
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+      const { partial, reads } = await readScreenOnce(capture, regionsRef.current);
+      setLastReads(reads);
+      if (Object.keys(partial).length > 0) {
+        onSnapshotRef.current(partial);
+        setLastUpdated(Date.now());
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the screen.');
+    }
+  }, [ensureCapture]);
 
   const openCalibration = useCallback(async () => {
     setError(null);
@@ -157,10 +180,12 @@ export function useScreenReader(
     status,
     error,
     lastUpdated,
+    lastReads,
     calibrationFrame,
     regions,
     start,
     stop,
+    readNow,
     openCalibration,
     saveCalibration,
     cancelCalibration,

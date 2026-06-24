@@ -168,6 +168,9 @@ export function LiveCoachPage() {
           <button type="button" className="ocr-btn ocr-cal" onClick={() => void reader.openCalibration()}>
             Calibrate
           </button>
+          <button type="button" className="ocr-btn" onClick={() => void reader.readNow()}>
+            Test once
+          </button>
         </div>
         <div className="ocr-bar-status">
           {reader.status === 'starting' && <span className="ocr-hint">Starting…</span>}
@@ -188,6 +191,25 @@ export function LiveCoachPage() {
           {reader.error && <span className="ocr-hint ocr-error">{reader.error}</span>}
         </div>
       </div>
+
+      {reader.lastReads.length > 0 && (
+        <div className="ocr-diag" aria-live="polite">
+          <span className="ocr-diag-title">Last read</span>
+          {reader.lastReads.map((r) => {
+            const accepted = r.confidence >= 60 && r.text.length > 0;
+            return (
+              <span
+                key={r.field}
+                className={`ocr-diag-chip ${accepted ? 'ok' : 'weak'}`}
+                title={accepted ? 'Accepted' : 'Ignored (low confidence or empty)'}
+              >
+                {r.field}: <strong>{r.text || '—'}</strong>
+                <em>{Math.round(r.confidence)}%</em>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <form className="coach-form" onSubmit={handleSubmit}>
         <fieldset className="coach-fieldset" disabled={!online}>

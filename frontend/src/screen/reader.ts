@@ -8,19 +8,25 @@ import { readField } from './ocr';
 import { parseReads, type OcrGameStatePartial, type OcrRead } from './parse';
 import { OCR_FIELDS, type OcrRegions } from './regions';
 
-/** Reads all fields once. Returns an empty partial if no frame is available. */
+/** Result of one screen-reading pass: the validated partial plus the raw reads. */
+export interface ReadResult {
+  partial: OcrGameStatePartial;
+  reads: OcrRead[];
+}
+
+/** Reads all fields once. Returns empty results if no frame is available. */
 export async function readScreenOnce(
   capture: ScreenCapture,
   regions: OcrRegions,
-): Promise<OcrGameStatePartial> {
+): Promise<ReadResult> {
   const frame = capture.grabFrame();
   if (!frame) {
-    return {};
+    return { partial: {}, reads: [] };
   }
 
   const reads: OcrRead[] = [];
   for (const field of OCR_FIELDS) {
     reads.push(await readField(frame, field, regions[field]));
   }
-  return parseReads(reads);
+  return { partial: parseReads(reads), reads };
 }
