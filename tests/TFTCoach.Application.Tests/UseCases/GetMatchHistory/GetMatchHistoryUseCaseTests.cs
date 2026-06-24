@@ -80,8 +80,8 @@ public class GetMatchHistoryUseCaseTests
         // Arrange — both ids are already in the cache, so no detail call should be made.
         var client = new FakeRiotMatchClient("puuid", ["M1", "M2"]);
         var repo = new RecordingMatchHistoryRepository();
-        repo.Seed(new TftMatchResult { MatchId = "M1", Placement = 1 });
-        repo.Seed(new TftMatchResult { MatchId = "M2", Placement = 4 });
+        repo.Seed(new TftMatchResult { MatchId = "M1", Placement = 1, SetNumber = 15 });
+        repo.Seed(new TftMatchResult { MatchId = "M2", Placement = 4, SetNumber = 15 });
         var useCase = NewUseCase(client, repo);
 
         // Act
@@ -104,7 +104,7 @@ public class GetMatchHistoryUseCaseTests
         // Arrange — M1 cached, M2 missing → only M2 is fetched and persisted.
         var client = new FakeRiotMatchClient("puuid", ["M1", "M2"]);
         var repo = new RecordingMatchHistoryRepository();
-        repo.Seed(new TftMatchResult { MatchId = "M1", Placement = 1 });
+        repo.Seed(new TftMatchResult { MatchId = "M1", Placement = 1, SetNumber = 15 });
         var useCase = NewUseCase(client, repo);
 
         // Act
@@ -163,10 +163,33 @@ public class GetMatchHistoryUseCaseTests
         Assert.Equal(["M1"], client.FetchedMatchIds);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldStopAtPreviousSet_WhenMatchesSpanMultipleSets()
+    {
+        // Arrange — M1/M2 are the current set (15); M3/M4 belong to an older set (14).
+        var sets = new Dictionary<string, int> { ["M1"] = 15, ["M2"] = 15, ["M3"] = 14, ["M4"] = 14 };
+        var client = new FakeRiotMatchClient("puuid", ["M1", "M2", "M3", "M4"], sets);
+        var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
+
+        // Act — request "all" games.
+        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        {
+            GameName = "Name",
+            TagLine = "TAG",
+            Count = 0,
+        });
+
+        // Assert — only current-set matches are returned; the older set is excluded.
+        Assert.Equal(["M1", "M2"], response.Matches.Select(m => m.MatchId).ToList());
+    }
+
     private static GetMatchHistoryUseCase NewUseCase(IRiotMatchClient client, IMatchHistoryRepository repo)
         => new(client, repo, NullLogger<GetMatchHistoryUseCase>.Instance);
 
-    private sealed class FakeRiotMatchClient(string puuid, IReadOnlyList<string> matchIds) : IRiotMatchClient
+    private sealed class FakeRiotMatchClient(
+        string puuid,
+        IReadOnlyList<string> matchIds,
+        IReadOnlyDictionary<string, int>? setByMatchId = null) : IRiotMatchClient
     {
         public string? LastGameName { get; private set; }
         public string? LastTagLine { get; private set; }
@@ -189,7 +212,8 @@ public class GetMatchHistoryUseCaseTests
         public Task<TftMatchResult?> GetMatchAsync(string matchId, string puuid, CancellationToken cancellationToken = default)
         {
             FetchedMatchIds.Add(matchId);
-            return Task.FromResult<TftMatchResult?>(new TftMatchResult { MatchId = matchId, Placement = 8 });
+            var set = setByMatchId is not null && setByMatchId.TryGetValue(matchId, out var s) ? s : 15;
+            return Task.FromResult<TftMatchResult?>(new TftMatchResult { MatchId = matchId, Placement = 8, SetNumber = set });
         }
     }
 

@@ -8,6 +8,7 @@ export interface TftMatchResult {
   matchId: string;
   playedAt: string;
   durationSeconds: number;
+  queueId: number;
   gameVersion: string | null;
   placement: number;
   level: number;
@@ -47,6 +48,34 @@ export interface AnalysisResponse {
   narrative: string;
 }
 
+export interface RankedEntry {
+  queueType: string;
+  tier: string | null;
+  division: string | null;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  hotStreak: boolean;
+  totalGames: number;
+  winRate: number;
+}
+
+export interface RankSnapshot {
+  queueType: string;
+  tier: string | null;
+  division: string | null;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  recordedAt: string;
+}
+
+export interface RanksResponse {
+  puuid: string;
+  entries: RankedEntry[];
+  history: RankSnapshot[];
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5214';
 
 async function readError(response: Response): Promise<string> {
@@ -76,4 +105,13 @@ export async function analyzeMatches(
     throw new Error(await readError(response));
   }
   return (await response.json()) as AnalysisResponse;
+}
+
+export async function fetchRanks(riotId: string): Promise<RanksResponse> {
+  const url = `${API_BASE}/ranks?riotId=${encodeURIComponent(riotId)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  return (await response.json()) as RanksResponse;
 }

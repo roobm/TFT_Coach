@@ -117,6 +117,8 @@ public sealed class RiotMatchClient(
                 MatchId = matchId,
                 PlayedAt = DateTimeOffset.FromUnixTimeMilliseconds(info.GameDatetime),
                 DurationSeconds = info.GameLength,
+                QueueId = info.QueueId,
+                SetNumber = info.TftSetNumber,
                 GameVersion = info.GameVersion,
                 Placement = participant.Placement,
                 Level = participant.Level,
@@ -183,6 +185,8 @@ public sealed class RiotMatchClient(
         long GameDatetime,
         double GameLength,
         string? GameVersion,
+        [property: JsonPropertyName("queue_id")] int QueueId,
+        [property: JsonPropertyName("tft_set_number")] int TftSetNumber,
         List<ParticipantDto>? Participants);
 
     private sealed record ParticipantDto(

@@ -32,41 +32,81 @@ public sealed class GetMatchHistoryUseCase(
 
         var cached = await LoadCachedAsync(puuid, matchIds, cancellationToken);
 
-        // Only pull detail from Riot for ids we have not already stored.
+        // Walk matches newest-first, fetching detail only for ids we have not stored.
+        // Riot returns ids in reverse-chronological order, so once we reach a match
+        // from an older TFT set we can stop: everything beyond it is a previous season.
+        // This keeps results scoped to the current set and avoids re-fetching the
+        // player's entire (multi-season) history from the throttled Riot API.
+        var currentSet = await ResolveCurrentSetAsync(puuid, matchIds, cached, cancellationToken);
+
         var fetched = new List<TftMatchResult>();
+        var matches = new List<TftMatchResult>();
         foreach (var matchId in matchIds)
         {
-            if (cached.ContainsKey(matchId))
+            if (!cached.TryGetValue(matchId, out var match))
             {
-                continue;
-            }
+                match = await riotClient.GetMatchAsync(matchId, puuid, cancellationToken);
+                if (match is null)
+                {
+                    continue;
+                }
 
-            var match = await riotClient.GetMatchAsync(matchId, puuid, cancellationToken);
-            if (match is not null)
-            {
                 fetched.Add(match);
                 cached[matchId] = match;
+            }
+
+            // Stop at the first match we can confidently place in an earlier set.
+            // Matches with an unknown set (0) are kept — legacy cached rows have no
+            // set recorded yet and are, in practice, current-season games.
+            if (currentSet > 0 && match.SetNumber > 0 && match.SetNumber != currentSet)
+            {
+                break;
+            }
+
+            matches.Add(match);
+            if (matches.Count >= count)
+            {
+                break;
             }
         }
 
         await PersistNewAsync(puuid, fetched, cancellationToken);
 
-        // Return in Riot's order (newest first), keeping only matches we could resolve.
-        var matches = matchIds
-            .Select(id => cached.GetValueOrDefault(id))
-            .Where(match => match is not null)
-            .Select(match => match!)
-            .ToList();
-
         logger.LogInformation(
-            "Returned {Total} matches for {GameName}#{TagLine} ({Cached} cached, {Fetched} from Riot)",
-            matches.Count, request.GameName, request.TagLine, matches.Count - fetched.Count, fetched.Count);
+            "Returned {Total} set-{Set} matches for {GameName}#{TagLine} ({Fetched} from Riot)",
+            matches.Count, currentSet, request.GameName, request.TagLine, fetched.Count);
 
         return new GetMatchHistoryResponse
         {
             Puuid = puuid,
             Matches = matches,
         };
+    }
+
+    // The current set is the set of the player's newest match. If that match is
+    // not cached (or was stored before set tracking existed), fetch it once so we
+    // have a reliable boundary; the fetched match is persisted for next time.
+    private async Task<int> ResolveCurrentSetAsync(
+        string puuid,
+        IReadOnlyList<string> matchIds,
+        Dictionary<string, TftMatchResult> cached,
+        CancellationToken cancellationToken)
+    {
+        var newestId = matchIds[0];
+        if (cached.TryGetValue(newestId, out var newest) && newest.SetNumber > 0)
+        {
+            return newest.SetNumber;
+        }
+
+        var fetchedNewest = await riotClient.GetMatchAsync(newestId, puuid, cancellationToken);
+        if (fetchedNewest is null)
+        {
+            return 0;
+        }
+
+        cached[newestId] = fetchedNewest;
+        await PersistNewAsync(puuid, [fetchedNewest], cancellationToken);
+        return fetchedNewest.SetNumber;
     }
 
     // Cache reads are best-effort: if the store is unavailable we simply fetch everything from Riot.

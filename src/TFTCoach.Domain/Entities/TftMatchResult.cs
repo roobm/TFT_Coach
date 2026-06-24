@@ -13,6 +13,12 @@ public sealed class TftMatchResult
     /// <summary>Game length in seconds.</summary>
     public double DurationSeconds { get; init; }
 
+    /// <summary>Riot queue id (e.g. 1100 = Ranked TFT, 1160 = Ranked Double Up). 0 when unknown.</summary>
+    public int QueueId { get; init; }
+
+    /// <summary>TFT set (season) number this match was played in. 0 when unknown.</summary>
+    public int SetNumber { get; init; }
+
     /// <summary>TFT set/patch identifier reported by Riot (e.g. game version).</summary>
     public string? GameVersion { get; init; }
 
