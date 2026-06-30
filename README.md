@@ -54,6 +54,23 @@ cp .env.example .env
 (and `supabase status`). At minimum set `RIOT_API_KEY`, and confirm the
 `LM_STUDIO_URL`, `EMBEDDING_MODEL`, and `CHAT_MODEL` values match your LM Studio setup.
 
+Key variables:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `RIOT_API_KEY` | *(required)* | Riot developer key |
+| `RIOT_REGION` | `europe` | Regional routing host for match/account endpoints |
+| `RIOT_PLATFORM` | `euw1` | Platform routing host for ranked (League-V1) endpoints |
+| `LIVE_CLIENT_URL` | `http://host.docker.internal:2999` | Riot Live Client Data API used by the live-coach page |
+| `LM_STUDIO_URL` | `http://host.docker.internal:1234/v1` | LM Studio server; use `http://localhost:1234/v1` outside Docker |
+| `CHAT_MODEL` | `local-model` | Model loaded in LM Studio for coaching/analysis |
+| `EMBEDDING_MODEL` | `text-embedding-nomic-embed-text-v1.5` | Embedding model (must output 1536 dims) |
+| `EMBEDDING_DIM` | `1536` | Vector dimension expected by the schema |
+| `META_PLATFORM` | `kr` | Platform used to sample the Challenger ladder for meta computation |
+| `META_REGION` | `asia` | Regional host for meta match fetching |
+| `META_MAX_PLAYERS` | *(default)* | How many ladder players to sample |
+| `META_MATCHES_PER_PLAYER` | *(default)* | Matches fetched per player |
+
 > When running the API/seeder **outside Docker**, use `http://localhost:1234/v1`
 > for `LM_STUDIO_URL` instead of `host.docker.internal`.
 
@@ -92,10 +109,18 @@ dotnet run --project src/TFTCoach.API
 - HTTP: http://localhost:5214
 - HTTPS: https://localhost:7101
 
-Endpoints:
+REST endpoints:
 
-- `GET /matches?riotId=Name%23TAG&count=10` — TFT match history.
+- `GET /matches?riotId=Name%23TAG&count=10&set=17` — TFT match history. `set` is optional; omit to return all sets.
 - `POST /matches/analysis` — LLM insights for a set of matches.
+- `GET /ranks?riotId=Name%23TAG` — current ranked standing for a summoner.
+- `POST /teamcode` — decode a TFT Team Planner share code into board units. Body: `{ "code": "<code>" }`.
+
+SignalR hub at `/hubs/coach` (use `@microsoft/signalr` in the frontend):
+
+- `GetSuggestion(request)` → returns one tagged coaching tip for the supplied board snapshot.
+- `GetMeta()` → returns the active meta (set, patch, comp names) or `null`.
+- `GetMetaComps()` → returns the full meta with tier, carries, key items, and notes per comp.
 
 ## 6. Run the frontend
 
@@ -123,10 +148,28 @@ cd frontend && npm run build # build the frontend
 src/
   TFTCoach.Domain/           # entities + interfaces (no other dependencies)
   TFTCoach.Application/      # use cases (Domain only)
+    UseCases/
+      AnalyzeMatchHistory/   # LLM insights for match history
+      DecodeTeamCode/        # decode TFT Team Planner share codes
+      GetMatchHistory/       # fetch + store match history via Riot API
+      GetRanks/              # ranked standing via Riot League-V1
+      GetSuggestion/         # single live coaching suggestion via LM Studio
+      SeedPatchData/         # embed patch content into pgvector
   TFTCoach.Infrastructure/   # Riot API, LM Studio, Supabase implementations
-  TFTCoach.API/              # ASP.NET Core endpoints / SignalR
+    InferenceService/        # LM Studio client + meta providers
+    Meta/                    # meta computation (Riot ladder + file fallback)
+    Persistence/             # Supabase repositories
+    RiotApi/                 # Riot match/league/live-client clients
+  TFTCoach.API/              # ASP.NET Core endpoints + SignalR hub
+    Hubs/CoachHub.cs         # /hubs/coach — GetSuggestion, GetMeta, GetMetaComps
   TFTCoach.Seeder/           # CLI tool to embed patch data
 frontend/                    # React + Vite client
+  src/
+    LiveCoachPage.tsx        # real-time coaching via SignalR
+    HistoryPage.tsx          # match history + LLM analysis
+    CompsPage.tsx            # current meta comps
+    coachHub.ts              # typed SignalR client wrapper
+    api.ts                   # REST API client
 supabase/                    # local config + migrations
 docs/plans/                  # per-feature plan files
 tests/                       # xUnit test projects
