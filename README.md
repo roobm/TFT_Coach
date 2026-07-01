@@ -28,7 +28,7 @@ step-by-step version see the sections below.
 | Inference    | LM Studio (local, OpenAI-compatible API)           |
 | Data         | Supabase (Postgres + pgvector + Auth)              |
 | Frontend     | React + Vite + TypeScript                          |
-| Game state   | Riot Live Client Data API + TFT log files          |
+| Game state   | Riot Live Client Data API                          |
 
 ## Prerequisites
 

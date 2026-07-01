@@ -14,7 +14,6 @@ A local-first AI coaching application for Teamfight Tactics. Delivers real-time 
 | Database + Vectors | Supabase (Postgres + pgvector + Auth) |
 | Frontend | React |
 | Game State | Riot Live Client Data API |
-| Log Watcher | `FileSystemWatcher` (.NET built-in) |
 
 ---
 
@@ -23,8 +22,7 @@ A local-first AI coaching application for Teamfight Tactics. Delivers real-time 
 ```
 Host Machine (macOS)
 ├── LM Studio                → port 1234 (OpenAI-compatible API)
-├── TFT game client          → Live Client Data API port 2999
-└── TFT log files            → watched by FileSystemWatcher
+└── TFT game client          → Live Client Data API port 2999
 
 Docker (development)
 ├── backend                  → ASP.NET Core + SignalR
@@ -47,17 +45,7 @@ React (browser)
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  PROCESS 2 — Log Watcher (runs during every game)               │
-│                                                                  │
-│  TFT Log File ──► FileSystemWatcher ──► Round Parser            │
-│                                               │                  │
-│                                               ▼                  │
-│                                     Supabase Postgres            │
-│                              (match_history + pgvector)          │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│  PROCESS 3 — Backend + Frontend (always running)                │
+│  PROCESS 2 — Backend + Frontend (always running)                │
 │                                                                  │
 │  Live Client Data API                                            │
 │  (poll every 2-3s)                                               │
@@ -81,7 +69,6 @@ React (browser)
 | Riot Data Dragon API | Seeder | Per patch | Champion/item/augment/trait stats |
 | Patch notes | Seeder | Per patch | Balance changes, meta shifts |
 | Live Client Data API | Backend | Every 2–3s | Board, gold, stage, hp, items |
-| TFT log files | Log Watcher | Per round | Placements, builds, outcomes |
 
 ---
 
@@ -110,16 +97,6 @@ CREATE TABLE match_history (
     gold_left   INTEGER,
     final_hp    INTEGER,
     rounds_lost INTEGER
-);
-
--- Round-level detail (vector search + stats)
-CREATE TABLE round_logs (
-    id          SERIAL PRIMARY KEY,
-    match_id    INTEGER REFERENCES match_history(id),
-    round       VARCHAR(10),
-    content     TEXT,
-    embedding   vector(1536),
-    created_at  TIMESTAMP DEFAULT NOW()
 );
 
 -- User profiles and payment
@@ -154,7 +131,6 @@ src/
 │   │   │   ├── GetSuggestionUseCase.cs
 │   │   │   ├── GetSuggestionRequest.cs
 │   │   │   └── GetSuggestionResponse.cs
-│   │   ├── IngestRoundLog/
 │   │   ├── SeedPatchData/
 │   │   └── GetRecap/
 │   └── Interfaces/
@@ -169,8 +145,7 @@ src/
 │   ├── RiotApi/
 │   │   ├── LiveClientService.cs
 │   │   └── DataDragonService.cs
-│   └── LogWatcher/
-│       └── TFTFileWatcher.cs
+│   └── Persistence/
 │
 └── TFTCoach.API/
     ├── Controllers/
@@ -259,21 +234,14 @@ Only fire a suggestion when game state meaningfully changes:
 - [x] `SupabaseVectorRepository` — upsert embeddings into `tft_patch_data`
 - [x] CLI flag `--patch 14.x` to re-seed without wiping match history
 
-### Phase 4: Log Watcher
-
-- [ ] Locate TFT log file path on macOS
-- [ ] `TFTFileWatcher` using `FileSystemWatcher`
-- [ ] Round-end event parser — extract units, items, augments, placement delta
-- [ ] `IngestRoundLog` use case — embed and store in `round_logs` + `match_history`
-
-### Phase 5: Backend + SignalR
+### Phase 4: Backend + SignalR
 
 - [ ] `LiveClientService` — poll Riot Live Client Data API every 2–3s
 - [ ] `GetSuggestion` use case — query pgvector, build prompt, call LM Studio
 - [ ] `CoachingHub` — SignalR hub pushing suggestions to connected React clients
 - [ ] `has_state_changed` logic — only trigger inference on meaningful state changes
 
-### Phase 6: React Frontend
+### Phase 5: React Frontend
 
 - [ ] Scaffold React app: `npm create vite@latest`
 - [ ] SignalR client: `@microsoft/signalr`
@@ -290,11 +258,9 @@ tests/
 ├── TFTCoach.Domain.Tests/
 ├── TFTCoach.Application.Tests/
 │   ├── GetSuggestionTests.cs
-│   ├── IngestRoundLogTests.cs
 │   └── GetRecapTests.cs
 └── TFTCoach.Infrastructure.Tests/
-    ├── LMStudioClientTests.cs
-    └── TFTFileWatcherTests.cs
+    └── LMStudioClientTests.cs
 ```
 
 **Suggestion output format**
@@ -370,7 +336,7 @@ LIVE_CLIENT_URL=http://host.docker.internal:2999
 
 - **Opponent board tracking**: Read all 8 player boards from the Live Client Data API each round. Track which comps are contested in the lobby and warn the player before they over-invest in a contested synergy.
 
-- **Riot ID bootstrap**: On first launch, resolve the player's Riot ID to a PUUID via the Account API and backfill the last 20 matches into `match_history` before the log watcher takes over.
+- **Riot ID bootstrap**: On first launch, resolve the player's Riot ID to a PUUID via the Account API and backfill the last 20 matches into `match_history`.
 
 - **Distributable package**: Wrap the entire stack into a single installable app — bundle the backend, React frontend, and model setup into one download with no terminal required. Electron wrapper for the React overlay as an always-on-top window.
 
