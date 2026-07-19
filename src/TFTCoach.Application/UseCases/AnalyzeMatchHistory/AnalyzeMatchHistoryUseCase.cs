@@ -18,10 +18,14 @@ public sealed class AnalyzeMatchHistoryUseCase(
     ILMStudioClient inference,
     IVectorRepository vectorRepository,
     IMatchHistoryRepository matchHistoryRepository,
+    IMetaProvider metaProvider,
     ILogger<AnalyzeMatchHistoryUseCase> logger)
 {
     private const int TopCompsCount = 3;
     private const int PatchContextCount = 5;
+
+    /// <summary>Cap how many meta comps are rendered so the meta section stays compact.</summary>
+    private const int MaxMetaComps = 6;
 
     /// <summary>Minimum placement delta between halves before a trend is non-stable.</summary>
     private const double TrendThreshold = 0.5;
@@ -31,7 +35,8 @@ public sealed class AnalyzeMatchHistoryUseCase(
         "student who wants to climb. You are given a fixed block of data: matches analyzed, average " +
         "placement, top-4 rate, win rate (1st), average level, a placement trend (Improving / Declining / " +
         "Stable), the player's most-played comps (comp | games | avg placement), per-match detail " +
-        "(placement, level, traits, augments, units), and optional patch/meta context.\n\n" +
+        "placement, level, traits, augments, units), the current meta comps, a meta-fit read of how the " +
+        "player's comps map to that meta, and optional patch/meta context.\n\n" +
         "GROUNDING (non-negotiable):\n" +
         "- Every number, rate, trend, and comp is a pre-computed FACT. Treat them as authoritative. Never " +
         "recompute, re-average, contradict, or invent numbers, champions, traits, augments, or items.\n" +
@@ -41,6 +46,9 @@ public sealed class AnalyzeMatchHistoryUseCase(
         "- Only use patch/meta context when it is provided, and only to interpret what the player did. Do " +
         "not assess positioning, scouting, mana, or item components — that data is NOT provided, so do not " +
         "speculate about it.\n" +
+        "- Use the current meta comps and the meta-fit read ONLY when provided: lean on them to judge whether " +
+        "the player is on- or off-meta and to name their closest meta comp. Never invent comps or champions " +
+        "not shown; if the fit read says they are off-meta, advise from first principles instead.\n" +
         "- If the sample is small or signals conflict, say so plainly rather than overstating a pattern.\n\n" +
         "COACHING LENS — judge the player on these and name the dimension you are invoking:\n" +
         "- Economy: average level vs. placement as a proxy for gold/interest management and greed vs. spend.\n" +
@@ -87,8 +95,9 @@ public sealed class AnalyzeMatchHistoryUseCase(
         await PersistAsync(request.Puuid, matches, cancellationToken);
 
         var patchContext = await RetrievePatchContextAsync(topComps, matches, cancellationToken);
+        var meta = await RetrieveMetaAsync(cancellationToken);
 
-        var userMessage = BuildPrompt(stats, topComps, trend, matches, patchContext);
+        var userMessage = BuildPrompt(stats, topComps, trend, matches, patchContext, meta);
         // Qwen3 hybrid-reasoning soft switch: /no_think must be the last token of the
         // user turn to suppress the model's chain-of-thought and answer directly.
         var raw = await inference.CompleteAsync(SystemPrompt, userMessage + "\n\n/no_think", cancellationToken);
@@ -254,12 +263,28 @@ public sealed class AnalyzeMatchHistoryUseCase(
         return $"Teamfight Tactics comps and meta for: {comps}. Traits: {string.Join(", ", traits)}.";
     }
 
+    private async Task<MetaSnapshot?> RetrieveMetaAsync(CancellationToken cancellationToken)
+    {
+        // Meta grounding is best-effort: if the meta source is unavailable the analysis
+        // still proceeds with no meta/fit section.
+        try
+        {
+            return await metaProvider.GetCurrentMetaAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to retrieve current meta for analysis; continuing without it.");
+            return null;
+        }
+    }
+
     private static string BuildPrompt(
         Stats stats,
         IReadOnlyList<CompPerformance> topComps,
         PlacementTrend trend,
         IReadOnlyList<TftMatchResult> matches,
-        IReadOnlyList<string> patchContext)
+        IReadOnlyList<string> patchContext,
+        MetaSnapshot? meta)
     {
         var builder = new StringBuilder();
         var culture = CultureInfo.InvariantCulture;
@@ -277,6 +302,8 @@ public sealed class AnalyzeMatchHistoryUseCase(
         {
             builder.AppendLine(culture, $"- {comp.Comp} | {comp.Games} | {comp.AveragePlacement:F2}");
         }
+
+        AppendMetaSection(builder, culture, topComps, matches, meta);
 
         builder.AppendLine();
         builder.AppendLine("Per-match detail:");
@@ -302,6 +329,114 @@ public sealed class AnalyzeMatchHistoryUseCase(
         }
 
         return builder.ToString();
+    }
+
+    // Renders the current meta as a compact list and a "meta fit" mapping of the
+    // player's most-played comps onto it, naming the closest meta comp for each.
+    // Mirrors the live coach's board-fit grounding: when nothing overlaps it tells
+    // the model the comps are off-meta so it advises from first principles rather
+    // than inventing a meta fit. Skipped entirely when no meta is available.
+    private static void AppendMetaSection(
+        StringBuilder builder,
+        CultureInfo culture,
+        IReadOnlyList<CompPerformance> topComps,
+        IReadOnlyList<TftMatchResult> matches,
+        MetaSnapshot? meta)
+    {
+        if (meta is null || meta.Comps.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.AppendLine(culture,
+            $"Current meta ({meta.Set}, patch {meta.Patch}) \u2014 the strongest comps right now:");
+        foreach (var comp in meta.Comps.Take(MaxMetaComps))
+        {
+            var tier = string.IsNullOrWhiteSpace(comp.Tier) ? "" : $" [{comp.Tier.Trim()}]";
+            var carries = comp.Carries.Count > 0 ? $" \u2014 carries {Join(comp.Carries)}" : "";
+            builder.AppendLine(culture, $"- {comp.Name.Trim()}{tier}{carries}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Meta fit (player's top comps mapped onto the current meta):");
+        var anyFit = false;
+        foreach (var comp in topComps)
+        {
+            var best = BestMetaFit(comp, matches, meta);
+            if (best is { } fit)
+            {
+                anyFit = true;
+                builder.AppendLine(culture,
+                    $"- {comp.Comp} most closely matches {fit.Name.Trim()} ({fit.Overlap} shared carries/traits).");
+            }
+            else
+            {
+                builder.AppendLine(culture,
+                    $"- {comp.Comp} matches no current meta comp \u2014 it is off-meta.");
+            }
+        }
+
+        if (!anyFit)
+        {
+            builder.AppendLine(
+                "None of the player's top comps map to the current meta \u2014 treat them as off-meta and " +
+                "advise from first principles rather than inventing a meta fit.");
+        }
+    }
+
+    // Finds the meta comp with the most overlap against a player comp. The player
+    // comp's searchable text is its trait label plus the traits and units of every
+    // match played under that label; overlap counts the meta comp's carries and
+    // name words that appear in it (case-insensitive substring), mirroring the live
+    // coach's CountCarryOverlap. Returns null when nothing overlaps.
+    private static (string Name, int Overlap)? BestMetaFit(
+        CompPerformance comp,
+        IReadOnlyList<TftMatchResult> matches,
+        MetaSnapshot meta)
+    {
+        var playerText = BuildCompText(comp, matches);
+        if (playerText.Length == 0)
+        {
+            return null;
+        }
+
+        var best = meta.Comps
+            .Select(m => (m.Name, Overlap: CountMetaOverlap(playerText, m)))
+            .Where(x => x.Overlap > 0)
+            .OrderByDescending(x => x.Overlap)
+            .FirstOrDefault();
+
+        return best.Overlap > 0 ? (best.Name, best.Overlap) : null;
+    }
+
+    // Aggregates a player comp's identity into one lower-cased haystack: its trait
+    // label plus every trait name and unit name from the matches played under it.
+    private static string BuildCompText(CompPerformance comp, IReadOnlyList<TftMatchResult> matches)
+    {
+        var tokens = new List<string> { comp.Comp };
+        foreach (var match in matches.Where(m => CompLabel(m) == comp.Comp))
+        {
+            tokens.AddRange(match.Traits.Select(TraitName));
+            tokens.AddRange(match.Units.Select(u => CleanItemName(u.Name)));
+        }
+
+        return string.Join(
+            " | ",
+            tokens.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.ToLowerInvariant()));
+    }
+
+    // Counts how many of a meta comp's carries and (longer) name words appear in the
+    // player comp's text, ignoring short noise words.
+    private static int CountMetaOverlap(string playerText, MetaComp comp)
+    {
+        var needles = comp.Carries
+            .Concat(comp.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Where(n => n.Trim().Length > 2)
+            .Select(n => n.Trim().ToLowerInvariant())
+            .Distinct();
+
+        return needles.Count(n => playerText.Contains(n, StringComparison.Ordinal));
     }
 
     private NarrativeResult ParseNarrative(string raw)

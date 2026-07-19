@@ -1553,6 +1553,25 @@ button:disabled {
   align-self: center;
 }
 
+.suggestion-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.suggestion-list li::marker {
+  color: var(--text-muted);
+}
+
+.suggestion-list li:first-child {
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .coach-grid,
   .coach-grid-wide {
