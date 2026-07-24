@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using TFTCoach.API.Hubs;
+using TFTCoach.API.Routes;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.DecodeTeamCode;
@@ -16,7 +16,21 @@ using TFTCoach.Infrastructure.RiotApi;
 var builder = WebApplication.CreateBuilder(args);
 
 // Load .env into configuration so secrets stay out of source.
-LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".env"));
+// Search multiple paths to work regardless of working directory (CLI vs VS Code).
+var envPaths = new[]
+{
+    Path.Combine(Environment.CurrentDirectory, ".env"),
+    Path.Combine(builder.Environment.ContentRootPath, ".env"),
+    Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".env"),
+};
+foreach (var envPath in envPaths)
+{
+    if (File.Exists(envPath))
+    {
+        LoadDotEnv(envPath);
+        break;
+    }
+}
 
 const string CorsPolicy = "frontend";
 var frontendOrigin = Environment.GetEnvironmentVariable("FRONTEND_ORIGIN") ?? "http://localhost:5173";
@@ -47,6 +61,9 @@ builder.Services.AddSignalR(options => options.EnableDetailedErrors = true)
 // frontend contract receives "Stable"/"Improving"/"Declining", not integers.
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // Riot match client (regional routing host).
 builder.Services.AddSingleton<RiotRateLimiter>();
@@ -185,81 +202,13 @@ builder.Services.AddSingleton<IMetaProvider>(sp =>
 var app = builder.Build();
 app.UseCors(CorsPolicy);
 
-app.MapGet("/", () => "TFT Coach API");
-
-// GET /matches?riotId=Name%23TAG&count=10&set=17
-app.MapGet("/matches", async (string riotId, int? count, int? set, GetMatchHistoryUseCase useCase, CancellationToken ct) =>
+if (app.Environment.IsDevelopment())
 {
-    if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
-    {
-        return Results.BadRequest("riotId must be in the form gameName#tagLine.");
-    }
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-    try
-    {
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
-        {
-            GameName = gameName,
-            TagLine = tagLine,
-            Count = count ?? 10,
-            Set = set ?? 0,
-        }, ct);
-
-        return Results.Ok(response);
-    }
-    catch (KeyNotFoundException ex)
-    {
-        return Results.NotFound(ex.Message);
-    }
-});
-
-// POST /matches/analysis  { "matches": [...] }
-app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, AnalyzeMatchHistoryUseCase useCase, CancellationToken ct) =>
-{
-    var response = await useCase.ExecuteAsync(request, ct);
-    return Results.Ok(response);
-});
-
-// POST /teamcode  { "code": "0201d0...TFTSet17" }
-app.MapPost("/teamcode", async (DecodeTeamCodeRequest request, DecodeTeamCodeUseCase useCase, CancellationToken ct) =>
-{
-    try
-    {
-        var response = await useCase.ExecuteAsync(request, ct);
-        return Results.Ok(response);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.BadRequest(ex.Message);
-    }
-});
-
-// GET /ranks?riotId=Name%23TAG
-app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, CancellationToken ct) =>
-{
-    if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
-    {
-        return Results.BadRequest("riotId must be in the form gameName#tagLine.");
-    }
-
-    try
-    {
-        var response = await useCase.ExecuteAsync(new GetRanksRequest
-        {
-            GameName = gameName,
-            TagLine = tagLine,
-        }, ct);
-
-        return Results.Ok(response);
-    }
-    catch (KeyNotFoundException ex)
-    {
-        return Results.NotFound(ex.Message);
-    }
-});
-
-// SignalR hub for live, real-time coaching suggestions.
-app.MapHub<CoachHub>("/hubs/coach");
+app.MapApiEndpoints();
 
 app.Run();
 
@@ -267,25 +216,6 @@ static int EnvInt(string name, int fallback)
 {
     var raw = Environment.GetEnvironmentVariable(name);
     return int.TryParse(raw, out var value) && value > 0 ? value : fallback;
-}
-
-static bool TryParseRiotId(string? riotId, out string gameName, out string tagLine){
-    gameName = string.Empty;
-    tagLine = string.Empty;
-    if (string.IsNullOrWhiteSpace(riotId))
-    {
-        return false;
-    }
-
-    var parts = riotId.Split('#', 2, StringSplitOptions.TrimEntries);
-    if (parts.Length != 2 || parts[0].Length == 0 || parts[1].Length == 0)
-    {
-        return false;
-    }
-
-    gameName = parts[0];
-    tagLine = parts[1];
-    return true;
 }
 
 static void LoadDotEnv(string path)

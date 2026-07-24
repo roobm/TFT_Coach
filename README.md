@@ -108,6 +108,8 @@ dotnet run --project src/TFTCoach.API
 
 - HTTP: http://localhost:5214
 - HTTPS: https://localhost:7101
+- Swagger UI (Development): http://localhost:5214/swagger
+- Swagger JSON (Development): http://localhost:5214/swagger/v1/swagger.json
 
 REST endpoints:
 
@@ -161,6 +163,7 @@ src/
     Persistence/             # Supabase repositories
     RiotApi/                 # Riot match/league/live-client clients
   TFTCoach.API/              # ASP.NET Core endpoints + SignalR hub
+    Routes/ApiEndpoints.cs   # REST endpoint mappings + Swagger summaries/descriptions
     Hubs/CoachHub.cs         # /hubs/coach — GetSuggestion, GetMeta, GetMetaComps
   TFTCoach.Seeder/           # CLI tool to embed patch data
 frontend/                    # React + Vite client
