@@ -20,9 +20,10 @@ internal static class ApiEndpoints
         {
             if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
             {
-                return ToHttpResult(RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Validation(
+                var invalidRiotId = RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Validation(
                     "validation.invalid_riot_id",
-                    "riotId must be in the form gameName#tagLine.")));
+                    "riotId must be in the form gameName#tagLine."));
+                return Results.Json(invalidRiotId, statusCode: ToErrorStatusCode(invalidRiotId.Error?.Code));
             }
 
             try
@@ -35,13 +36,16 @@ internal static class ApiEndpoints
                     Set = set ?? 0,
                 }, ct);
 
-                return ToHttpResult(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to load match history.");
-                return ToHttpResult(RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Unexpected(
-                    "Failed to load match history.")));
+                var failure = RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to load match history."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Get TFT match history")
@@ -54,14 +58,15 @@ internal static class ApiEndpoints
             try
             {
                 var response = await useCase.ExecuteAsync(request, ct);
-                return ToHttpResult(RequestResult<AnalyzeMatchHistoryResponse>.Ok(response));
+                return Results.Ok(RequestResult<AnalyzeMatchHistoryResponse>.Ok(response));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to generate match analysis.");
-                return ToHttpResult(RequestResult<AnalyzeMatchHistoryResponse>.Fail(ApiErrors.ExternalDependency(
+                var failure = RequestResult<AnalyzeMatchHistoryResponse>.Fail(ApiErrors.ExternalDependency(
                     "external.analysis_unavailable",
-                    "Failed to generate match analysis.")));
+                    "Failed to generate match analysis."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Analyze match history with LM Studio")
@@ -73,13 +78,16 @@ internal static class ApiEndpoints
             try
             {
                 var response = await useCase.ExecuteAsync(request, ct);
-                return ToHttpResult(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to decode team code.");
-                return ToHttpResult(RequestResult<DecodeTeamCodeResponse>.Fail(ApiErrors.Unexpected(
-                    "Failed to decode team code.")));
+                var failure = RequestResult<DecodeTeamCodeResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to decode team code."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Decode a TFT Team Planner code")
@@ -90,9 +98,10 @@ internal static class ApiEndpoints
         {
             if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
             {
-                return ToHttpResult(RequestResult<GetRanksResponse>.Fail(ApiErrors.Validation(
+                var invalidRiotId = RequestResult<GetRanksResponse>.Fail(ApiErrors.Validation(
                     "validation.invalid_riot_id",
-                    "riotId must be in the form gameName#tagLine.")));
+                    "riotId must be in the form gameName#tagLine."));
+                return Results.Json(invalidRiotId, statusCode: ToErrorStatusCode(invalidRiotId.Error?.Code));
             }
 
             try
@@ -103,13 +112,16 @@ internal static class ApiEndpoints
                     TagLine = tagLine,
                 }, ct);
 
-                return ToHttpResult(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to load rank data.");
-                return ToHttpResult(RequestResult<GetRanksResponse>.Fail(ApiErrors.Unexpected(
-                    "Failed to load rank data.")));
+                var failure = RequestResult<GetRanksResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to load rank data."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Get player rank details")
@@ -139,21 +151,14 @@ internal static class ApiEndpoints
         return true;
     }
 
-    private static IResult ToHttpResult<T>(RequestResult<T> result)
+    private static int ToErrorStatusCode(string? code)
     {
-        if (result.Success)
+        return code switch
         {
-            return Results.Ok(result);
-        }
-
-        var statusCode = result.Error?.Code switch
-        {
-            var code when code is not null && code.StartsWith("validation.", StringComparison.Ordinal) => StatusCodes.Status400BadRequest,
-            var code when code is not null && code.StartsWith("not_found.", StringComparison.Ordinal) => StatusCodes.Status404NotFound,
-            var code when code is not null && code.StartsWith("external.", StringComparison.Ordinal) => StatusCodes.Status503ServiceUnavailable,
+            var value when value is not null && value.StartsWith("validation.", StringComparison.Ordinal) => StatusCodes.Status400BadRequest,
+            var value when value is not null && value.StartsWith("not_found.", StringComparison.Ordinal) => StatusCodes.Status404NotFound,
+            var value when value is not null && value.StartsWith("external.", StringComparison.Ordinal) => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status500InternalServerError,
         };
-
-        return Results.Json(result, statusCode: statusCode);
     }
 }
