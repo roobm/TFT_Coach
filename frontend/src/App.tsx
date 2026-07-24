@@ -198,10 +198,10 @@ export default function App() {
               {loadingAnalysis ? (
                 <span className="btn-spinner">
                   <span className="spinner" aria-hidden="true" />
-                  Analyzing…
+                  Reviewing...
                 </span>
               ) : (
-                'Analyze with AI'
+                'Generate coaching summary'
               )}
             </button>
           </div>
@@ -227,8 +227,8 @@ export default function App() {
       {!loadingMatches && matches.length === 0 && !error && (
         <div className="empty">
           <EmptyIcon />
-          <h3>No matches yet</h3>
-          <p>Search for a Riot ID above to see recent matches and AI insights.</p>
+          <h3>No ranked sample loaded</h3>
+          <p>Enter Riot ID#TAG to inspect your latest matches, tempo profile, and coaching summary.</p>
         </div>
       )}
     </>

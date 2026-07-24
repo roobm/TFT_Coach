@@ -1,8 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
 :root {
   color-scheme: dark;
 
   /* Type */
-  --font-sans: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-sans: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
 
   /* Surfaces */
   --bg: #0b0d12;
@@ -18,9 +21,9 @@
   --text-faint: #6b7384;
 
   /* Accent */
-  --accent: #4f7cff;
-  --accent-strong: #6a91ff;
-  --accent-soft: rgba(79, 124, 255, 0.14);
+  --accent: #08a6a2;
+  --accent-strong: #1ecac2;
+  --accent-soft: rgba(8, 166, 162, 0.16);
 
   /* Placement semantics */
   --gold: #f5c451;
@@ -33,7 +36,7 @@
   /* Chips */
   --trait: #8fb6ff;
   --unit: #d6deea;
-  --augment: #d8b4fe;
+  --augment: #f3c979;
 
   --radius: 14px;
   --radius-sm: 9px;
@@ -53,8 +56,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(1100px 520px at 50% -8%, rgba(79, 124, 255, 0.12), transparent 60%),
-    radial-gradient(900px 600px at 100% 0%, rgba(245, 196, 81, 0.05), transparent 55%),
+    radial-gradient(1200px 580px at 6% -12%, rgba(8, 166, 162, 0.16), transparent 62%),
+    radial-gradient(760px 460px at 100% 6%, rgba(245, 196, 81, 0.08), transparent 58%),
     var(--bg);
 }
 
@@ -68,7 +71,7 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 1rem;
   margin-bottom: 1.75rem;
 }
 
@@ -77,49 +80,56 @@ body {
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 12px;
-  background: linear-gradient(140deg, var(--accent) 0%, #7a5cff 100%);
-  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.35);
+  border-radius: 50%;
+  border: 1px solid rgba(245, 196, 81, 0.5);
+  background: radial-gradient(circle at 30% 25%, rgba(245, 196, 81, 0.2), rgba(8, 166, 162, 0.26));
+  box-shadow: 0 6px 18px rgba(8, 166, 162, 0.28);
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   color: #fff;
-  letter-spacing: -0.5px;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.65rem;
+  font-size: 1.7rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
   line-height: 1.1;
+  font-family: var(--font-display);
 }
 
 .subtitle {
   margin: 0.15rem 0 0;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 /* ---------- Primary nav ---------- */
 .app-nav {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.2rem;
   margin-left: auto;
-  background: var(--bg-elev-1);
+  background: color-mix(in srgb, var(--bg-elev-1) 88%, var(--accent) 12%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.25rem;
+  padding: 0.2rem;
 }
 
 .nav-link {
   display: inline-flex;
   align-items: center;
-  padding: 0.4rem 0.9rem;
+  padding: 0.38rem 0.86rem;
   border-radius: calc(var(--radius) - 4px);
   color: var(--text-muted);
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -129,7 +139,8 @@ body {
 }
 
 .nav-link.active {
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 36%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
   color: #fff;
 }
 
@@ -187,15 +198,15 @@ body {
 button {
   padding: 0.8rem 1.3rem;
   border-radius: 11px;
-  border: 1px solid transparent;
-  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 65%, var(--bg-elev-2));
   color: #fff;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   transition: filter 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
-  box-shadow: 0 4px 14px rgba(79, 124, 255, 0.28);
+  box-shadow: 0 4px 14px rgba(8, 166, 162, 0.23);
   white-space: nowrap;
 }
 
@@ -209,7 +220,7 @@ button:active:not(:disabled) {
 
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 14px rgba(79, 124, 255, 0.28);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 14px rgba(8, 166, 162, 0.23);
 }
 
 button:disabled {
@@ -272,9 +283,10 @@ button:disabled {
   text-align: center;
   padding: 3.5rem 1.5rem;
   color: var(--text-muted);
-  border: 1px dashed var(--border-strong);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 60%, var(--accent) 40%);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.012);
+  background:
+    linear-gradient(160deg, rgba(8, 166, 162, 0.08), rgba(255, 255, 255, 0.01));
 }
 
 .empty .empty-icon {
@@ -318,8 +330,8 @@ button:disabled {
 /* ---------- Insights ---------- */
 .insights {
   position: relative;
-  background: linear-gradient(180deg, rgba(79, 124, 255, 0.08), rgba(79, 124, 255, 0.02));
-  border: 1px solid rgba(79, 124, 255, 0.25);
+  background: linear-gradient(180deg, rgba(8, 166, 162, 0.1), rgba(8, 166, 162, 0.03));
+  border: 1px solid rgba(8, 166, 162, 0.32);
   border-radius: var(--radius);
   padding: 1.1rem 1.25rem;
   margin-bottom: 1.5rem;
@@ -334,7 +346,7 @@ button:disabled {
   font-weight: 700;
 }
 
-.insights-title .ai-dot {
+.insights-title .insight-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -723,8 +735,8 @@ button:disabled {
 }
 
 .chip {
-  font-size: 0.78rem;
-  font-weight: 500;
+  font-size: 0.76rem;
+  font-weight: 600;
   padding: 0.2rem 0.55rem;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -732,27 +744,37 @@ button:disabled {
 }
 
 .chip.trait {
-  background: rgba(79, 124, 255, 0.1);
-  border-color: rgba(79, 124, 255, 0.25);
+  background: rgba(8, 166, 162, 0.12);
+  border-color: rgba(8, 166, 162, 0.34);
   color: var(--trait);
 }
 
 .chip.unit {
-  background: var(--bg-elev-2);
+  background: color-mix(in srgb, var(--bg-elev-2) 82%, var(--gold) 18%);
   color: var(--unit);
 }
 
 .chip.augment {
-  background: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.28);
+  background: rgba(245, 196, 81, 0.12);
+  border-color: rgba(245, 196, 81, 0.32);
   color: var(--augment);
 }
 
-.chip-more {
-  font-size: 0.74rem;
-  color: var(--text-faint);
-  align-self: center;
-  padding: 0.2rem 0.2rem;
+.chip-expand {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.chip-expand:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+  filter: none;
 }
 
 /* ---------- Skeleton loading ---------- */
@@ -1046,12 +1068,15 @@ button:disabled {
 }
 
 .rank-streak {
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 600;
   color: var(--gold);
   background: var(--gold-soft);
-  padding: 0.12rem 0.4rem;
+  padding: 0.14rem 0.44rem;
   border-radius: 999px;
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1662,7 +1687,7 @@ button:disabled {
   gap: 0.6rem;
 }
 
-.comp-name {
+.comp-card-name {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
@@ -1724,7 +1749,7 @@ button:disabled {
   gap: 0.35rem;
 }
 
-.chip {
+.comp-chip {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.82rem;
@@ -1732,12 +1757,13 @@ button:disabled {
   background: var(--bg-elev-2);
 }
 
-.chip-carry {
+.comp-chip-carry {
   color: var(--unit);
-  border-color: rgba(143, 182, 255, 0.3);
+  border-color: rgba(8, 166, 162, 0.38);
+  background: rgba(8, 166, 162, 0.12);
 }
 
-.chip-item {
+.comp-chip-item {
   color: var(--gold);
   border-color: rgba(245, 196, 81, 0.3);
   background: var(--gold-soft);

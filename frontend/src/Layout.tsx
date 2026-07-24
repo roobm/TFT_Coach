@@ -80,10 +80,10 @@ export function Layout() {
   return (
     <main className="app">
       <header className="app-header">
-        <span className="brand-mark" aria-hidden="true">TC</span>
+        <span className="brand-mark" aria-hidden="true">S</span>
         <div className="app-header-text">
           <h1>TFT Coach</h1>
-          <p className="subtitle">Recent Teamfight Tactics matches with local AI insights.</p>
+          <p className="subtitle">Patch-aware local coaching for ranked TFT decisions.</p>
         </div>
         <nav className="app-nav" aria-label="Primary">
           <NavLink to="/" end className={navClass}>Matches</NavLink>
