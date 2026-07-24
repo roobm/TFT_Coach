@@ -1,4 +1,5 @@
 using TFTCoach.API.Hubs;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.UseCases.AnalyzeMatchHistory;
 using TFTCoach.Application.UseCases.DecodeTeamCode;
 using TFTCoach.Application.UseCases.GetMatchHistory;
@@ -15,11 +16,14 @@ internal static class ApiEndpoints
             .WithDescription("Returns a simple string confirming the TFT Coach API service is running.");
 
         // GET /matches?riotId=Name%23TAG&count=10&set=17
-        app.MapGet("/matches", async (string riotId, int? count, int? set, GetMatchHistoryUseCase useCase, CancellationToken ct) =>
+        app.MapGet("/matches", async (string riotId, int? count, int? set, GetMatchHistoryUseCase useCase, ILogger<Program> logger, CancellationToken ct) =>
         {
             if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
             {
-                return Results.BadRequest("riotId must be in the form gameName#tagLine.");
+                var invalidRiotId = RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Validation(
+                    "validation.invalid_riot_id",
+                    "riotId must be in the form gameName#tagLine."));
+                return Results.Json(invalidRiotId, statusCode: ToErrorStatusCode(invalidRiotId.Error?.Code));
             }
 
             try
@@ -32,11 +36,16 @@ internal static class ApiEndpoints
                     Set = set ?? 0,
                 }, ct);
 
-                return Results.Ok(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
-            catch (KeyNotFoundException ex)
+            catch (Exception ex)
             {
-                return Results.NotFound(ex.Message);
+                logger.LogError(ex, "Failed to load match history.");
+                var failure = RequestResult<GetMatchHistoryResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to load match history."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Get TFT match history")
@@ -44,36 +53,55 @@ internal static class ApiEndpoints
                 + "Use count to limit how many matches are returned and set to filter by TFT set.");
 
         // POST /matches/analysis  { "matches": [...] }
-        app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, AnalyzeMatchHistoryUseCase useCase, CancellationToken ct) =>
+        app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, AnalyzeMatchHistoryUseCase useCase, ILogger<Program> logger, CancellationToken ct) =>
         {
-            var response = await useCase.ExecuteAsync(request, ct);
-            return Results.Ok(response);
+            try
+            {
+                var response = await useCase.ExecuteAsync(request, ct);
+                return Results.Ok(RequestResult<AnalyzeMatchHistoryResponse>.Ok(response));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to generate match analysis.");
+                var failure = RequestResult<AnalyzeMatchHistoryResponse>.Fail(ApiErrors.ExternalDependency(
+                    "external.analysis_unavailable",
+                    "Failed to generate match analysis."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
+            }
         })
             .WithSummary("Analyze match history with LM Studio")
             .WithDescription("Generates post-game coaching insights from provided match history data using the local LM Studio model.");
 
         // POST /teamcode  { "code": "0201d0...TFTSet17" }
-        app.MapPost("/teamcode", async (DecodeTeamCodeRequest request, DecodeTeamCodeUseCase useCase, CancellationToken ct) =>
+        app.MapPost("/teamcode", async (DecodeTeamCodeRequest request, DecodeTeamCodeUseCase useCase, ILogger<Program> logger, CancellationToken ct) =>
         {
             try
             {
                 var response = await useCase.ExecuteAsync(request, ct);
-                return Results.Ok(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
-                return Results.BadRequest(ex.Message);
+                logger.LogError(ex, "Failed to decode team code.");
+                var failure = RequestResult<DecodeTeamCodeResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to decode team code."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Decode a TFT Team Planner code")
             .WithDescription("Decodes a TFT Team Planner share code into readable board units and positions.");
 
         // GET /ranks?riotId=Name%23TAG
-        app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, CancellationToken ct) =>
+        app.MapGet("/ranks", async (string riotId, GetRanksUseCase useCase, ILogger<Program> logger, CancellationToken ct) =>
         {
             if (!TryParseRiotId(riotId, out var gameName, out var tagLine))
             {
-                return Results.BadRequest("riotId must be in the form gameName#tagLine.");
+                var invalidRiotId = RequestResult<GetRanksResponse>.Fail(ApiErrors.Validation(
+                    "validation.invalid_riot_id",
+                    "riotId must be in the form gameName#tagLine."));
+                return Results.Json(invalidRiotId, statusCode: ToErrorStatusCode(invalidRiotId.Error?.Code));
             }
 
             try
@@ -84,11 +112,16 @@ internal static class ApiEndpoints
                     TagLine = tagLine,
                 }, ct);
 
-                return Results.Ok(response);
+                return response.Success
+                    ? Results.Ok(response)
+                    : Results.Json(response, statusCode: ToErrorStatusCode(response.Error?.Code));
             }
-            catch (KeyNotFoundException ex)
+            catch (Exception ex)
             {
-                return Results.NotFound(ex.Message);
+                logger.LogError(ex, "Failed to load rank data.");
+                var failure = RequestResult<GetRanksResponse>.Fail(ApiErrors.Unexpected(
+                    "Failed to load rank data."));
+                return Results.Json(failure, statusCode: ToErrorStatusCode(failure.Error?.Code));
             }
         })
             .WithSummary("Get player rank details")
@@ -116,5 +149,16 @@ internal static class ApiEndpoints
         gameName = parts[0];
         tagLine = parts[1];
         return true;
+    }
+
+    private static int ToErrorStatusCode(string? code)
+    {
+        return code switch
+        {
+            var value when value is not null && value.StartsWith("validation.", StringComparison.Ordinal) => StatusCodes.Status400BadRequest,
+            var value when value is not null && value.StartsWith("not_found.", StringComparison.Ordinal) => StatusCodes.Status404NotFound,
+            var value when value is not null && value.StartsWith("external.", StringComparison.Ordinal) => StatusCodes.Status503ServiceUnavailable,
+            _ => StatusCodes.Status500InternalServerError,
+        };
     }
 }

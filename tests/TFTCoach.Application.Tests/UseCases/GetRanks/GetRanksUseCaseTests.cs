@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.GetRanks;
 using TFTCoach.Domain.Entities;
@@ -20,17 +21,35 @@ public class GetRanksUseCaseTests
         var useCase = NewUseCase(matchClient, leagueClient, new RecordingRankHistoryRepository());
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetRanksRequest
+        var result = await useCase.ExecuteAsync(new GetRanksRequest
         {
             GameName = "Faker",
             TagLine = "EUW",
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal("puuid-123", response.Puuid);
         var entry = Assert.Single(response.Entries);
         Assert.Equal("RANKED_TFT", entry.QueueType);
         Assert.Equal("GOLD", entry.Tier);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnNotFoundError_WhenPuuidResolutionFails()
+    {
+        // Arrange
+        var useCase = NewUseCase(
+            new FakeRiotMatchClient("puuid", throwOnResolve: true),
+            new FakeRiotLeagueClient([]),
+            new RecordingRankHistoryRepository());
+
+        // Act
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Missing", TagLine = "EUW" });
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("not_found.player", result.Error?.Code);
     }
 
     [Fact]
@@ -42,7 +61,8 @@ public class GetRanksUseCaseTests
         var useCase = NewUseCase(matchClient, leagueClient, new RecordingRankHistoryRepository());
 
         // Act
-        await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        AssertSuccess(result);
 
         // Assert
         Assert.Equal("puuid-abc", leagueClient.RequestedPuuid);
@@ -58,7 +78,8 @@ public class GetRanksUseCaseTests
             new RecordingRankHistoryRepository());
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Empty(response.Entries);
@@ -76,7 +97,8 @@ public class GetRanksUseCaseTests
         var useCase = NewUseCase(new FakeRiotMatchClient("puuid"), new FakeRiotLeagueClient(entries), repo);
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal("puuid", repo.RecordedPuuid);
@@ -95,7 +117,8 @@ public class GetRanksUseCaseTests
         var useCase = NewUseCase(new FakeRiotMatchClient("puuid"), new FakeRiotLeagueClient(entries), new ThrowingRankHistoryRepository());
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Single(response.Entries);
@@ -108,10 +131,24 @@ public class GetRanksUseCaseTests
         IRankHistoryRepository rankHistoryRepository)
         => new(matchClient, leagueClient, rankHistoryRepository, NullLogger<GetRanksUseCase>.Instance);
 
-    private sealed class FakeRiotMatchClient(string puuid) : IRiotMatchClient
+    private static T AssertSuccess<T>(RequestResult<T> result)
+    {
+        Assert.True(result.Success);
+        Assert.Null(result.Error);
+        return Assert.IsType<T>(result.Data);
+    }
+
+    private sealed class FakeRiotMatchClient(string puuid, bool throwOnResolve = false) : IRiotMatchClient
     {
         public Task<string> ResolvePuuidAsync(string gameName, string tagLine, CancellationToken cancellationToken = default)
-            => Task.FromResult(puuid);
+        {
+            if (throwOnResolve)
+            {
+                throw new KeyNotFoundException("Summoner not found.");
+            }
+
+            return Task.FromResult(puuid);
+        }
 
         public Task<IReadOnlyList<string>> GetRecentMatchIdsAsync(string puuid, int count, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<string>>([]);

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.GetMatchHistory;
 using TFTCoach.Domain.Entities;
@@ -16,12 +17,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Faker",
             TagLine = "EUW",
             Count = 5,
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal("puuid-123", response.Puuid);
@@ -29,6 +31,26 @@ public class GetMatchHistoryUseCaseTests
         Assert.Equal("Faker", client.LastGameName);
         Assert.Equal("EUW", client.LastTagLine);
         Assert.Equal(5, client.LastCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnNotFoundError_WhenPuuidResolutionFails()
+    {
+        // Arrange
+        var client = new FakeRiotMatchClient("puuid", ["EUW_1"], throwOnResolve: true);
+        var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
+
+        // Act
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        {
+            GameName = "Missing",
+            TagLine = "EUW",
+            Count = 5,
+        });
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("not_found.player", result.Error?.Code);
     }
 
     [Theory]
@@ -42,12 +64,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
 
         // Act
-        await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = requested,
         });
+        AssertSuccess(result);
 
         // Assert
         Assert.Equal(expected, client.LastCount);
@@ -63,12 +86,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
 
         // Act
-        await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = requested,
         });
+        AssertSuccess(result);
 
         // Assert
         Assert.Equal(int.MaxValue, client.LastCount);
@@ -85,12 +109,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, repo);
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 2,
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal(2, response.Matches.Count);
@@ -108,12 +133,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, repo);
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 2,
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal(2, response.Matches.Count);
@@ -132,12 +158,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, repo);
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 3,
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal(["M1", "M2", "M3"], response.Matches.Select(m => m.MatchId).ToList());
@@ -151,12 +178,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new ThrowingMatchHistoryRepository());
 
         // Act
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 1,
         });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Single(response.Matches);
@@ -172,12 +200,13 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
 
         // Act — request "all" games.
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 0,
         });
+        var response = AssertSuccess(result);
 
         // Assert — only current-set matches are returned; the older set is excluded.
         Assert.Equal(["M1", "M2"], response.Matches.Select(m => m.MatchId).ToList());
@@ -194,13 +223,14 @@ public class GetMatchHistoryUseCaseTests
         var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
 
         // Act — explicitly request set 14.
-        var response = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
         {
             GameName = "Name",
             TagLine = "TAG",
             Count = 0,
             Set = 14,
         });
+        var response = AssertSuccess(result);
 
         // Assert — newer set (15) skipped, older set (13) stops the walk.
         Assert.Equal(["M3", "M4"], response.Matches.Select(m => m.MatchId).ToList());
@@ -211,10 +241,18 @@ public class GetMatchHistoryUseCaseTests
     private static GetMatchHistoryUseCase NewUseCase(IRiotMatchClient client, IMatchHistoryRepository repo)
         => new(client, repo, NullLogger<GetMatchHistoryUseCase>.Instance);
 
+    private static T AssertSuccess<T>(RequestResult<T> result)
+    {
+        Assert.True(result.Success);
+        Assert.Null(result.Error);
+        return Assert.IsType<T>(result.Data);
+    }
+
     private sealed class FakeRiotMatchClient(
         string puuid,
         IReadOnlyList<string> matchIds,
-        IReadOnlyDictionary<string, int>? setByMatchId = null) : IRiotMatchClient
+        IReadOnlyDictionary<string, int>? setByMatchId = null,
+        bool throwOnResolve = false) : IRiotMatchClient
     {
         public string? LastGameName { get; private set; }
         public string? LastTagLine { get; private set; }
@@ -225,6 +263,10 @@ public class GetMatchHistoryUseCaseTests
         {
             LastGameName = gameName;
             LastTagLine = tagLine;
+            if (throwOnResolve)
+            {
+                throw new KeyNotFoundException("Summoner not found.");
+            }
             return Task.FromResult(puuid);
         }
 

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.GetSuggestion;
 
@@ -36,16 +37,19 @@ public sealed class CoachHub(
     /// Produces one coaching suggestion for the supplied game state and returns
     /// it to the calling client.
     /// </summary>
-    public async Task<GetSuggestionResponse> GetSuggestion(GetSuggestionRequest request)
+    public async Task<RequestResult<GetSuggestionResponse>> GetSuggestion(GetSuggestionRequest request)
     {
         try
         {
-            return await useCase.ExecuteAsync(request, Context.ConnectionAborted);
+            var response = await useCase.ExecuteAsync(request, Context.ConnectionAborted);
+            return RequestResult<GetSuggestionResponse>.Ok(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to generate a live coaching suggestion.");
-            throw new HubException("Failed to generate a suggestion. Is LM Studio running?");
+            return RequestResult<GetSuggestionResponse>.Fail(ApiErrors.ExternalDependency(
+                "external.live_coach_unavailable",
+                "Failed to generate a suggestion. Is LM Studio running?"));
         }
     }
 
@@ -53,22 +57,25 @@ public sealed class CoachHub(
     /// Returns the active meta (set, patch, comp names) the coach is grounded on,
     /// or <c>null</c> if no meta is configured.
     /// </summary>
-    public async Task<MetaInfo?> GetMeta()
+    public async Task<RequestResult<MetaInfo?>> GetMeta()
     {
         try
         {
             var meta = await metaProvider.GetCurrentMetaAsync(Context.ConnectionAborted);
             if (meta is null)
             {
-                return null;
+                return RequestResult<MetaInfo?>.Ok(null);
             }
 
-            return new MetaInfo(meta.Set, meta.Patch, meta.Comps.Select(c => c.Name).ToList());
+            return RequestResult<MetaInfo?>.Ok(
+                new MetaInfo(meta.Set, meta.Patch, meta.Comps.Select(c => c.Name).ToList()));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load the current meta.");
-            throw new HubException("Failed to load the current meta.");
+            return RequestResult<MetaInfo?>.Fail(ApiErrors.ExternalDependency(
+                "external.meta_unavailable",
+                "Failed to load the current meta."));
         }
     }
 
@@ -77,25 +84,27 @@ public sealed class CoachHub(
     /// carries, key items and notes — for the Comps page. <c>null</c> when no meta
     /// is configured.
     /// </summary>
-    public async Task<MetaDetail?> GetMetaComps()
+    public async Task<RequestResult<MetaDetail?>> GetMetaComps()
     {
         try
         {
             var meta = await metaProvider.GetCurrentMetaAsync(Context.ConnectionAborted);
             if (meta is null)
             {
-                return null;
+                return RequestResult<MetaDetail?>.Ok(null);
             }
 
             var comps = meta.Comps
                 .Select(c => new MetaCompInfo(c.Name, c.Tier, c.Playstyle, c.Carries, c.KeyItems, c.Notes))
                 .ToList();
-            return new MetaDetail(meta.Set, meta.Patch, comps);
+            return RequestResult<MetaDetail?>.Ok(new MetaDetail(meta.Set, meta.Patch, comps));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load the current meta comps.");
-            throw new HubException("Failed to load the current meta.");
+            return RequestResult<MetaDetail?>.Fail(ApiErrors.ExternalDependency(
+                "external.meta_unavailable",
+                "Failed to load the current meta."));
         }
     }
 }

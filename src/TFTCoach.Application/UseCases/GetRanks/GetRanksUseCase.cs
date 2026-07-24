@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Domain.Entities;
 using TFTCoach.Domain.Interfaces;
@@ -17,11 +18,21 @@ public sealed class GetRanksUseCase(
     IRankHistoryRepository rankHistoryRepository,
     ILogger<GetRanksUseCase> logger)
 {
-    public async Task<GetRanksResponse> ExecuteAsync(
+    public async Task<RequestResult<GetRanksResponse>> ExecuteAsync(
         GetRanksRequest request,
         CancellationToken cancellationToken = default)
     {
-        var puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
+        string puuid;
+        try
+        {
+            puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return RequestResult<GetRanksResponse>.Fail(
+                ApiErrors.NotFound("not_found.player", ex.Message));
+        }
+
         var entries = await leagueClient.GetRankedEntriesAsync(puuid, cancellationToken);
 
         await RecordSnapshotsAsync(puuid, entries, cancellationToken);
@@ -31,12 +42,13 @@ public sealed class GetRanksUseCase(
             "Returned {Count} ranked entries ({History} history points) for {GameName}#{TagLine}",
             entries.Count, history.Count, request.GameName, request.TagLine);
 
-        return new GetRanksResponse
-        {
-            Puuid = puuid,
-            Entries = entries,
-            History = history,
-        };
+        return RequestResult<GetRanksResponse>.Ok(
+            new GetRanksResponse
+            {
+                Puuid = puuid,
+                Entries = entries,
+                History = history,
+            });
     }
 
     // Recording is best-effort: a storage failure must not fail the request.

@@ -1,4 +1,5 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import type { ApiEnvelope } from './api';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5214';
 
@@ -43,6 +44,13 @@ export interface MetaDetail {
   set: string;
   patch: string;
   comps: MetaComp[];
+}
+
+function unwrapEnvelope<T>(payload: ApiEnvelope<T>): T {
+  if (!payload.success) {
+    throw new Error(payload.error?.message ?? 'Request failed.');
+  }
+  return payload.data;
 }
 
 let connection: HubConnection | null = null;
@@ -93,17 +101,20 @@ export async function disconnect(): Promise<void> {
 /** Fetches the active meta the coach is grounded on, or null if none is set. */
 export async function getMeta(): Promise<MetaInfo | null> {
   const conn = await getConnection();
-  return conn.invoke<MetaInfo | null>('GetMeta');
+  const payload = await conn.invoke<ApiEnvelope<MetaInfo | null>>('GetMeta');
+  return unwrapEnvelope(payload);
 }
 
 /** Fetches the full current meta (every comp with detail), or null if none is set. */
 export async function getMetaComps(): Promise<MetaDetail | null> {
   const conn = await getConnection();
-  return conn.invoke<MetaDetail | null>('GetMetaComps');
+  const payload = await conn.invoke<ApiEnvelope<MetaDetail | null>>('GetMetaComps');
+  return unwrapEnvelope(payload);
 }
 
 /** Requests a single live coaching suggestion for the given board state. */
 export async function requestSuggestion(state: GameState): Promise<CoachingSuggestion> {
   const conn = await getConnection();
-  return conn.invoke<CoachingSuggestion>('GetSuggestion', { state });
+  const payload = await conn.invoke<ApiEnvelope<CoachingSuggestion>>('GetSuggestion', { state });
+  return unwrapEnvelope(payload);
 }

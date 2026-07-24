@@ -21,6 +21,18 @@ export interface TftMatchResult {
   units: UnitDetail[];
 }
 
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, string[]>;
+}
+
+export interface ApiEnvelope<T> {
+  success: boolean;
+  data: T;
+  error: ApiError | null;
+}
+
 export interface MatchHistoryResponse {
   puuid: string;
   matches: TftMatchResult[];
@@ -80,9 +92,30 @@ export interface RanksResponse {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5214';
 
-async function readError(response: Response): Promise<string> {
-  const text = await response.text();
-  return text || `Request failed with status ${response.status}.`;
+function statusMessage(status: number): string {
+  return `Request failed with status ${status}.`;
+}
+
+async function readEnvelope<T>(response: Response): Promise<T> {
+  let payload: ApiEnvelope<T> | null = null;
+  try {
+    payload = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    if (!response.ok) {
+      throw new Error(statusMessage(response.status));
+    }
+    throw new Error('Invalid API response payload.');
+  }
+
+  if (!payload.success) {
+    throw new Error(payload.error?.message ?? statusMessage(response.status));
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message ?? statusMessage(response.status));
+  }
+
+  return payload.data;
 }
 
 export async function fetchMatchHistory(riotId: string, count = 10, set = 0): Promise<MatchHistoryResponse> {
@@ -91,10 +124,7 @@ export async function fetchMatchHistory(riotId: string, count = 10, set = 0): Pr
     params.set('set', String(set));
   }
   const response = await fetch(`${API_BASE}/matches?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return (await response.json()) as MatchHistoryResponse;
+  return readEnvelope<MatchHistoryResponse>(response);
 }
 
 export async function analyzeMatches(
@@ -106,19 +136,13 @@ export async function analyzeMatches(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ matches, puuid }),
   });
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return (await response.json()) as AnalysisResponse;
+  return readEnvelope<AnalysisResponse>(response);
 }
 
 export async function fetchRanks(riotId: string): Promise<RanksResponse> {
   const url = `${API_BASE}/ranks?riotId=${encodeURIComponent(riotId)}`;
   const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return (await response.json()) as RanksResponse;
+  return readEnvelope<RanksResponse>(response);
 }
 
 export interface DecodedUnit {
@@ -137,8 +161,5 @@ export async function decodeTeamCode(code: string): Promise<TeamCodeResponse> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
   });
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return (await response.json()) as TeamCodeResponse;
+  return readEnvelope<TeamCodeResponse>(response);
 }
