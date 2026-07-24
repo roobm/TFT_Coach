@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Domain.Entities;
 using TFTCoach.Domain.Interfaces;
@@ -15,7 +16,7 @@ public sealed class GetMatchHistoryUseCase(
     IMatchHistoryRepository matchHistoryRepository,
     ILogger<GetMatchHistoryUseCase> logger)
 {
-    public async Task<GetMatchHistoryResponse> ExecuteAsync(
+    public async Task<RequestResult<GetMatchHistoryResponse>> ExecuteAsync(
         GetMatchHistoryRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -28,11 +29,22 @@ public sealed class GetMatchHistoryUseCase(
         // newest `count` ids already cover the current set.
         var idFetchCount = request.Set > 0 ? int.MaxValue : count;
 
-        var puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
+        string puuid;
+        try
+        {
+            puuid = await riotClient.ResolvePuuidAsync(request.GameName, request.TagLine, cancellationToken);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return RequestResult<GetMatchHistoryResponse>.Fail(
+                ApiErrors.NotFound("not_found.player", ex.Message));
+        }
+
         var matchIds = await riotClient.GetRecentMatchIdsAsync(puuid, idFetchCount, cancellationToken);
         if (matchIds.Count == 0)
         {
-            return new GetMatchHistoryResponse { Puuid = puuid, Matches = [] };
+            return RequestResult<GetMatchHistoryResponse>.Ok(
+                new GetMatchHistoryResponse { Puuid = puuid, Matches = [] });
         }
 
         var cached = await LoadCachedAsync(puuid, matchIds, cancellationToken);
@@ -90,13 +102,14 @@ public sealed class GetMatchHistoryUseCase(
             "Returned {Total} set-{Set} matches for {GameName}#{TagLine} ({Fetched} from Riot)",
             matches.Count, targetSet, request.GameName, request.TagLine, fetched.Count);
 
-        return new GetMatchHistoryResponse
-        {
-            Puuid = puuid,
-            Matches = matches,
-            CurrentSet = currentSet,
-            Set = targetSet,
-        };
+        return RequestResult<GetMatchHistoryResponse>.Ok(
+            new GetMatchHistoryResponse
+            {
+                Puuid = puuid,
+                Matches = matches,
+                CurrentSet = currentSet,
+                Set = targetSet,
+            });
     }
 
     // The current set is the set of the player's newest match. If that match is

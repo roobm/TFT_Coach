@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 using TFTCoach.Application.UseCases.DecodeTeamCode;
 using TFTCoach.Domain.Entities;
@@ -28,8 +29,9 @@ public class DecodeTeamCodeUseCaseTests
         var useCase = NewUseCase(Set17);
 
         // Act
-        var response = await useCase.ExecuteAsync(
+        var result = await useCase.ExecuteAsync(
             new DecodeTeamCodeRequest { Code = "0201d00d02103903b03801305003a000TFTSet17" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal("TFTSet17", response.Set);
@@ -46,8 +48,9 @@ public class DecodeTeamCodeUseCaseTests
         var useCase = NewUseCase(Set17);
 
         // Act
-        var response = await useCase.ExecuteAsync(
+        var result = await useCase.ExecuteAsync(
             new DecodeTeamCodeRequest { Code = "0201d00d000000TFTSet17" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal(new[] { "Aatrox", "Akali" }, response.Units.Select(u => u.Name).ToArray());
@@ -60,26 +63,37 @@ public class DecodeTeamCodeUseCaseTests
         var useCase = NewUseCase(Set17);
 
         // Act
-        var response = await useCase.ExecuteAsync(
+        var result = await useCase.ExecuteAsync(
             new DecodeTeamCodeRequest { Code = "0201dfffTFTSet17" });
+        var response = AssertSuccess(result);
 
         // Assert
         Assert.Equal(new[] { "Aatrox" }, response.Units.Select(u => u.Name).ToArray());
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldThrow_WhenCodeHasNoSetSuffix()
+    public async Task ExecuteAsync_ShouldReturnValidationError_WhenCodeHasNoSetSuffix()
     {
         // Arrange
         var useCase = NewUseCase(Set17);
 
-        // Act + Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            useCase.ExecuteAsync(new DecodeTeamCodeRequest { Code = "0201d00d" }));
+        // Act
+        var result = await useCase.ExecuteAsync(new DecodeTeamCodeRequest { Code = "0201d00d" });
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("validation.invalid_team_code", result.Error?.Code);
     }
 
     private static DecodeTeamCodeUseCase NewUseCase(IReadOnlyDictionary<int, TeamPlannerChampion> map) =>
         new(new FakeTeamPlanner(map), NullLogger<DecodeTeamCodeUseCase>.Instance);
+
+    private static T AssertSuccess<T>(RequestResult<T> result)
+    {
+        Assert.True(result.Success);
+        Assert.Null(result.Error);
+        return Assert.IsType<T>(result.Data);
+    }
 
     private static TeamPlannerChampion Champ(string id, string name, int cost) =>
         new() { CharacterId = id, Name = name, Cost = cost };

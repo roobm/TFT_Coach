@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using TFTCoach.Application.Common;
 using TFTCoach.Application.Interfaces;
 
 namespace TFTCoach.Application.UseCases.DecodeTeamCode;
@@ -18,7 +19,7 @@ public sealed partial class DecodeTeamCodeUseCase(
     [GeneratedRegex(@"^(..)(.*?)(TFTSet\d+(?:_Act\d+)?)$", RegexOptions.IgnoreCase)]
     private static partial Regex TeamCodeRegex();
 
-    public async Task<DecodeTeamCodeResponse> ExecuteAsync(
+    public async Task<RequestResult<DecodeTeamCodeResponse>> ExecuteAsync(
         DecodeTeamCodeRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -26,8 +27,9 @@ public sealed partial class DecodeTeamCodeUseCase(
         var match = TeamCodeRegex().Match(code);
         if (!match.Success)
         {
-            throw new ArgumentException(
-                "Invalid team code. Expected a TFT Team Planner code ending in e.g. 'TFTSet17'.");
+            return RequestResult<DecodeTeamCodeResponse>.Fail(ApiErrors.Validation(
+                "validation.invalid_team_code",
+                "Invalid team code. Expected a TFT Team Planner code ending in e.g. 'TFTSet17'."));
         }
 
         var version = match.Groups[1].Value;
@@ -53,7 +55,8 @@ public sealed partial class DecodeTeamCodeUseCase(
             "Decoded team code for {Set}: {Found}/{Total} champions resolved",
             setId, units.Count, codes.Count);
 
-        return new DecodeTeamCodeResponse { Set = setId, Units = units };
+        return RequestResult<DecodeTeamCodeResponse>.Ok(
+            new DecodeTeamCodeResponse { Set = setId, Units = units });
     }
 
     // Split the hex body into fixed-width chunks, parse each as a code, drop empty (0) slots.

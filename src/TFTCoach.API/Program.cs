@@ -16,20 +16,17 @@ using TFTCoach.Infrastructure.RiotApi;
 var builder = WebApplication.CreateBuilder(args);
 
 // Load .env into configuration so secrets stay out of source.
-// Search multiple paths to work regardless of working directory (CLI vs VS Code).
-var envPaths = new[]
+// Walk upward from common start paths so this works from VS Code, dotnet run,
+// and direct binary launches after reopening the workspace.
+var dotEnvPath = FindDotEnvPath(new[]
 {
-    Path.Combine(Environment.CurrentDirectory, ".env"),
-    Path.Combine(builder.Environment.ContentRootPath, ".env"),
-    Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".env"),
-};
-foreach (var envPath in envPaths)
+    Environment.CurrentDirectory,
+    builder.Environment.ContentRootPath,
+    AppContext.BaseDirectory,
+});
+if (dotEnvPath is not null)
 {
-    if (File.Exists(envPath))
-    {
-        LoadDotEnv(envPath);
-        break;
-    }
+    LoadDotEnv(dotEnvPath);
 }
 
 const string CorsPolicy = "frontend";
@@ -216,6 +213,36 @@ static int EnvInt(string name, int fallback)
 {
     var raw = Environment.GetEnvironmentVariable(name);
     return int.TryParse(raw, out var value) && value > 0 ? value : fallback;
+}
+
+static string? FindDotEnvPath(IEnumerable<string> startPaths)
+{
+    foreach (var startPath in startPaths)
+    {
+        if (string.IsNullOrWhiteSpace(startPath))
+        {
+            continue;
+        }
+
+        var directory = new DirectoryInfo(startPath);
+        if (!directory.Exists)
+        {
+            continue;
+        }
+
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, ".env");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+    }
+
+    return null;
 }
 
 static void LoadDotEnv(string path)

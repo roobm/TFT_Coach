@@ -10,7 +10,15 @@ using TFTCoach.Seeder;
 //   --embedding-model <name>    LM Studio embedding model id (env EMBEDDING_MODEL).
 //   --embedding-dim <n>         Expected embedding dimension (env EMBEDDING_DIM, default 1536).
 
-EnvFile.LoadInto(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+var dotEnvPath = FindDotEnvPath(new[]
+{
+    Environment.CurrentDirectory,
+    AppContext.BaseDirectory,
+});
+if (dotEnvPath is not null)
+{
+    EnvFile.LoadInto(dotEnvPath);
+}
 
 var arguments = CliArgs.Parse(args);
 var patch = arguments.GetValueOrDefault("patch");
@@ -66,4 +74,34 @@ catch (Exception ex)
 {
     Console.Error.WriteLine($"Seeding failed: {ex.Message}");
     return 1;
+}
+
+static string? FindDotEnvPath(IEnumerable<string> startPaths)
+{
+    foreach (var startPath in startPaths)
+    {
+        if (string.IsNullOrWhiteSpace(startPath))
+        {
+            continue;
+        }
+
+        var directory = new DirectoryInfo(startPath);
+        if (!directory.Exists)
+        {
+            continue;
+        }
+
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, ".env");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+    }
+
+    return null;
 }

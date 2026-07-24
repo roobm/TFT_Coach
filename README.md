@@ -118,11 +118,34 @@ REST endpoints:
 - `GET /ranks?riotId=Name%23TAG` — current ranked standing for a summoner.
 - `POST /teamcode` — decode a TFT Team Planner share code into board units. Body: `{ "code": "<code>" }`.
 
+Every REST response uses the same envelope:
+
+```json
+{
+  "success": true,
+  "data": { "...": "endpoint payload" },
+  "error": null
+}
+```
+
+Failed requests return:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "validation.invalid_riot_id",
+    "message": "riotId must be in the form gameName#tagLine."
+  }
+}
+```
+
 SignalR hub at `/hubs/coach` (use `@microsoft/signalr` in the frontend):
 
-- `GetSuggestion(request)` → returns one tagged coaching tip for the supplied board snapshot.
-- `GetMeta()` → returns the active meta (set, patch, comp names) or `null`.
-- `GetMetaComps()` → returns the full meta with tier, carries, key items, and notes per comp.
+- `GetSuggestion(request)` → returns `{ success, data, error }` where `data` is one tagged coaching tip.
+- `GetMeta()` → returns `{ success, data, error }` where `data` is the active meta or `null`.
+- `GetMetaComps()` → returns `{ success, data, error }` where `data` is full current meta or `null`.
 
 ## 6. Run the frontend
 
