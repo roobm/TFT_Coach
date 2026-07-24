@@ -90,18 +90,17 @@ export function HistoryPage() {
 
       {!loading && searched && !hasData && !error && (
         <div className="empty">
-          <h3>No rank history yet</h3>
+          <h3>No ranked timeline yet</h3>
           <p>
-            Play Ranked TFT and check your rank a few times — recorded snapshots build accurate history,
-            and recent ranked games estimate the climb in between.
+            Play a few Ranked TFT games, then refresh rank snapshots to build a reliable climb timeline.
           </p>
         </div>
       )}
 
       {!searched && !error && (
         <div className="empty">
-          <h3>Rank history</h3>
-          <p>Enter a Riot ID to chart how your rank has climbed over time.</p>
+          <h3>Rank climb tracker</h3>
+          <p>Search Riot ID#TAG to chart LP movement across recent ranked matches.</p>
         </div>
       )}
     </>

@@ -14,7 +14,7 @@ function CompCard({ comp }: { comp: MetaComp }) {
     <article className="comp-card">
       <header className="comp-card-head">
         <span className={`comp-tier tier-${tier.toLowerCase()}`}>{tier}</span>
-        <h3 className="comp-name">{comp.name}</h3>
+        <h3 className="comp-card-name">{comp.name}</h3>
       </header>
 
       {comp.carries.length > 0 && (
@@ -22,7 +22,7 @@ function CompCard({ comp }: { comp: MetaComp }) {
           <span className="comp-row-label">Carries</span>
           <ul className="chip-list">
             {comp.carries.map((c) => (
-              <li key={c} className="chip chip-carry">{c}</li>
+              <li key={c} className="comp-chip comp-chip-carry">{c}</li>
             ))}
           </ul>
         </div>
@@ -33,7 +33,7 @@ function CompCard({ comp }: { comp: MetaComp }) {
           <span className="comp-row-label">Key items</span>
           <ul className="chip-list">
             {comp.keyItems.map((i) => (
-              <li key={i} className="chip chip-item">{i}</li>
+              <li key={i} className="comp-chip comp-chip-item">{i}</li>
             ))}
           </ul>
         </div>
@@ -58,7 +58,7 @@ export function CompsPage() {
       const detail = await getMetaComps();
       setMeta(detail);
     } catch {
-      setError('Could not load the meta. Is the API running?');
+      setError('Meta feed unavailable. Confirm the API is running and retry.');
     } finally {
       setLoading(false);
     }
@@ -74,13 +74,13 @@ export function CompsPage() {
     <section className="comps-page">
       <div className="comps-header">
         <div className="comps-header-text">
-          <h2>Current meta comps</h2>
+          <h2>Ladder meta board plans</h2>
           {meta ? (
             <p className="comps-subtitle">
-              {meta.set} · patch {meta.patch} · sampled from the Riot Challenger ladder
+              {meta.set} · patch {meta.patch} · sampled from Riot Challenger match data
             </p>
           ) : (
-            <p className="comps-subtitle">Computed live from the top of the Riot ranked ladder.</p>
+            <p className="comps-subtitle">Fetching current comp trends from the top ranked ladder.</p>
           )}
         </div>
         <button type="button" className="comps-refresh" onClick={load} disabled={loading}>
@@ -111,7 +111,7 @@ export function CompsPage() {
 
       {!loading && !error && comps.length === 0 && (
         <p className="comps-empty">
-          No meta comps are available yet. The live sample may still be warming up — try Refresh in a moment.
+          No comp snapshot available yet. The ladder sample may still be warming up, try Refresh shortly.
         </p>
       )}
 

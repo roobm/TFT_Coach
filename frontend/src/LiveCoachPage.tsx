@@ -162,7 +162,7 @@ export function LiveCoachPage() {
             <span className="coach-toggle-thumb" />
           </span>
           <span className="coach-toggle-label">
-            {online ? 'Coach online' : 'Coach offline'}
+            {online ? 'Coach armed' : 'Coach idle'}
           </span>
         </button>
 
@@ -243,7 +243,7 @@ export function LiveCoachPage() {
         <fieldset className="coach-fieldset" disabled={!online}>
           <div className="coach-grid">
             <label className="coach-field">
-              <span>Stage</span>
+              <span>Current stage</span>
               <input
                 type="text"
                 value={stage}
@@ -252,15 +252,15 @@ export function LiveCoachPage() {
               />
             </label>
             <label className="coach-field">
-              <span>Gold</span>
+              <span>Banked gold</span>
               <input type="number" min={0} value={gold} onChange={(e) => setGold(Number(e.target.value))} />
             </label>
             <label className="coach-field">
-              <span>Level</span>
+              <span>Board level</span>
               <input type="number" min={1} max={11} value={level} onChange={(e) => setLevel(Number(e.target.value))} />
             </label>
             <label className="coach-field">
-              <span>Health</span>
+              <span>Little legend HP</span>
               <input type="number" min={0} max={100} value={health} onChange={(e) => setHealth(Number(e.target.value))} />
             </label>
             <label className="coach-field">
@@ -278,7 +278,7 @@ export function LiveCoachPage() {
                   className="teamcode-input"
                   value={teamCode}
                   onChange={(e) => setTeamCode(e.target.value)}
-                  placeholder="Paste TFT team code, e.g. 0201d00d…TFTSet17"
+                  placeholder="Paste TFT team code, e.g. 0201d00d...TFTSet17"
                 />
                 <button
                   type="button"
@@ -314,7 +314,7 @@ export function LiveCoachPage() {
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Anything else — what you're contesting, augments, etc."
+                placeholder="Context: contested units, augments, econ plan, or pivot target"
             />
           </label>
 
@@ -326,7 +326,7 @@ export function LiveCoachPage() {
                   Thinking…
                 </span>
               ) : (
-                'Get suggestion'
+                'Coach this spot'
               )}
             </button>
           </div>
@@ -357,11 +357,11 @@ export function LiveCoachPage() {
 
       {!suggestion && !error && !loading && (
         <div className="empty">
-          <h3>Live coach</h3>
+          <h3>Round decision desk</h3>
           <p>
             {online
-              ? 'Enter your current board and get one high-impact suggestion for this moment.'
-              : 'Toggle the coach online when you load into a game to start getting live suggestions.'}
+              ? 'Capture board state and receive one immediate action for this round.'
+              : 'Set coach to armed when game starts, then request one focused round call at a time.'}
           </p>
         </div>
       )}

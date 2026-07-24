@@ -45,7 +45,7 @@ function RankEntryCard({ entry }: { entry: RankedEntry }) {
       <div className="rank-card-head">
         <span className="rank-queue">{queueLabel(entry.queueType)}</span>
         {entry.hotStreak && (
-          <span className="rank-streak" title="On a hot streak">🔥 Hot streak</span>
+          <span className="rank-streak" title="On a win streak">Win streak</span>
         )}
       </div>
 

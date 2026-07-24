@@ -1,4 +1,5 @@
 import type { TftMatchResult, UnitDetail } from '../api';
+import { useState } from 'react';
 
 function placementTone(placement: number): 'first' | 'top' | 'bottom' {
   if (placement === 1) return 'first';
@@ -72,9 +73,13 @@ function ChipGroup({
   items: string[];
   variant: 'trait' | 'unit' | 'augment';
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
-  const visible = items.slice(0, MAX_CHIPS);
+  const hasOverflow = items.length > MAX_CHIPS;
+  const visible = expanded || !hasOverflow ? items : items.slice(0, MAX_CHIPS);
+
   const hidden = items.length - visible.length;
+
   return (
     <div className="chip-group">
       <span className="chip-group-label">{label}</span>
@@ -84,7 +89,26 @@ function ChipGroup({
             {cleanName(item)}
           </span>
         ))}
-        {hidden > 0 && <span className="chip-more">+{hidden} more</span>}
+        {hidden > 0 && (
+          <button
+            type="button"
+            className="chip-expand"
+            onClick={() => setExpanded(true)}
+            aria-label={`Show ${hidden} more ${label.toLowerCase()}`}
+          >
+            +{hidden} more
+          </button>
+        )}
+        {expanded && hasOverflow && (
+          <button
+            type="button"
+            className="chip-expand"
+            onClick={() => setExpanded(false)}
+            aria-label={`Show fewer ${label.toLowerCase()}`}
+          >
+            Show less
+          </button>
+        )}
       </div>
     </div>
   );

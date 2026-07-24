@@ -41,8 +41,8 @@ export function AnalysisPanel({ analysis }: { analysis: AnalysisResponse }) {
   return (
     <div className="insights">
       <h3 className="insights-title">
-        <span className="ai-dot" aria-hidden="true" />
-        AI Analysis
+        <span className="insight-dot" aria-hidden="true" />
+        Coaching Summary
         <span className="badge">{analysis.matchesAnalyzed} matches</span>
         <TrendBadge trend={analysis.trend} />
       </h3>
