@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type {
   AnalysisResponse,
   RankedEntry,
@@ -79,10 +79,16 @@ export function Layout() {
   const [riotId, setRiotId] = useState(() => localStorage.getItem(RIOT_ID_KEY) ?? '');
   const [matchesState, setMatchesState] = useState<MatchesState>(initialMatchesState);
   const [historyState, setHistoryState] = useState<HistoryState>(initialHistoryState);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     localStorage.setItem(RIOT_ID_KEY, riotId);
   }, [riotId]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   return (
     <main className="app">
@@ -92,12 +98,27 @@ export function Layout() {
           <h1>TFT Coach</h1>
           <p className="subtitle">Patch-aware local coaching for ranked TFT decisions.</p>
         </div>
-        <nav className="app-nav" aria-label="Primary">
-          <NavLink to="/" end className={navClass}>Matches</NavLink>
-          <NavLink to="/history" className={navClass}>History</NavLink>
-          <NavLink to="/comps" className={navClass}>Comps</NavLink>
-          <NavLink to="/live-coach" className={navClass}>Live Coach</NavLink>
-        </nav>
+        <div className="app-nav-wrap">
+          <button
+            type="button"
+            className={`menu-toggle ${menuOpen ? 'open' : ''}`}
+            aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={menuOpen}
+            aria-controls="primary-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </button>
+          <nav id="primary-menu" className={`app-nav ${menuOpen ? 'open' : ''}`} aria-label="Primary">
+            <NavLink to="/" end className={navClass}>Matches</NavLink>
+            <NavLink to="/history" className={navClass}>History</NavLink>
+            <NavLink to="/comps" className={navClass}>Comps</NavLink>
+            <NavLink to="/live-coach" className={navClass}>Live Coach</NavLink>
+            <NavLink to="/patch-notes" className={navClass}>Patch Notes</NavLink>
+          </nav>
+        </div>
       </header>
 
       <Outlet
