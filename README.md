@@ -113,9 +113,9 @@ dotnet run --project src/TFTCoach.API
 
 REST endpoints:
 
-- `GET /matches?riotId=Name%23TAG&count=10&set=17` — TFT match history. `set` is optional; omit to return all sets.
+- `GET /matches?riotId=Name%23TAG&count=10&set=17` — TFT match history. `set=0` (or omitted) = current set, `set>0` = specific set, `set<0` = all sets.
 - `POST /matches/analysis` — LLM insights for a set of matches.
-- `GET /ranks?riotId=Name%23TAG` — current ranked standing for a summoner.
+- `GET /ranks?riotId=Name%23TAG` — current ranked standing, snapshot history, and best rank per recorded set.
 - `POST /teamcode` — decode a TFT Team Planner share code into board units. Body: `{ "code": "<code>" }`.
 
 Every REST response uses the same envelope:
@@ -192,7 +192,7 @@ src/
 frontend/                    # React + Vite client
   src/
     LiveCoachPage.tsx        # real-time coaching via SignalR
-    HistoryPage.tsx          # match history + LLM analysis
+    HistoryPage.tsx          # rank climb chart + best ranks by season
     CompsPage.tsx            # current meta comps
     coachHub.ts              # typed SignalR client wrapper
     api.ts                   # REST API client

@@ -59,6 +59,20 @@ function lpToLabel(lp: number): string {
   return `${titleCase(TIERS[index])} ${division}`;
 }
 
+function lpToRankWithPoints(lp: number): string {
+  if (lp >= MASTER_FLOOR) {
+    return `Master ${lp - MASTER_FLOOR} LP`;
+  }
+
+  const clamped = Math.max(0, lp);
+  const tierIndex = Math.min(TIERS.indexOf('DIAMOND'), Math.floor(clamped / 400));
+  const withinTier = clamped - tierIndex * 400;
+  const divisionIndex = Math.min(3, Math.floor(withinTier / 100));
+  const division = ['IV', 'III', 'II', 'I'][divisionIndex];
+  const leaguePoints = withinTier - divisionIndex * 100;
+  return `${titleCase(TIERS[tierIndex])} ${division} ${leaguePoints} LP`;
+}
+
 interface Point {
   t: number;
   lp: number;
@@ -198,6 +212,8 @@ export function RankClimbChart({
   }
 
   const netEstimate = estimate.length >= 2 ? estimate[estimate.length - 1].lp - estimate[0].lp : 0;
+  const peakLp = Math.max(...allPoints.map((point) => point.lp));
+  const peakLabel = lpToRankWithPoints(Math.round(peakLp));
 
   // Current-rank callout pill, offset clear of the line so it never overlaps the
   // path or end marker. A climbing line ends at the top, so the pill goes above;
@@ -219,11 +235,14 @@ export function RankClimbChart({
     <section className="climb" aria-label="Rank climb">
       <div className="climb-head">
         <h3 className="climb-title">Rank climb</h3>
-        {estimate.length >= 2 && (
-          <span className={`climb-net ${netEstimate >= 0 ? 'up' : 'down'}`}>
-            {netEstimate >= 0 ? '▲' : '▼'} {Math.abs(Math.round(netEstimate))} LP est. over {estimate.length} ranked
-          </span>
-        )}
+        <div className="climb-metrics">
+          <span className="climb-peak">Peak: {peakLabel}</span>
+          {estimate.length >= 2 && (
+            <span className={`climb-net ${netEstimate >= 0 ? 'up' : 'down'}`}>
+              {netEstimate >= 0 ? '▲' : '▼'} {Math.abs(Math.round(netEstimate))} LP est. over {estimate.length} ranked
+            </span>
+          )}
+        </div>
       </div>
 
       <svg className="climb-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Estimated rank progression">

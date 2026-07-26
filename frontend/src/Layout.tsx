@@ -4,13 +4,13 @@ import type {
   AnalysisResponse,
   RankedEntry,
   RankSnapshot,
+  SeasonBestRank,
   TftMatchResult,
 } from './api';
 
 /** Persisted result state for the Matches page, kept here so it survives navigation. */
 export interface MatchesState {
   count: number;
-  season: number;
   currentSet: number;
   resultSet: number;
   matches: TftMatchResult[];
@@ -23,9 +23,13 @@ export interface MatchesState {
 
 /** Persisted result state for the History page, kept here so it survives navigation. */
 export interface HistoryState {
+  season: number;
+  currentSet: number;
+  allSeasonMatches: TftMatchResult[];
   matches: TftMatchResult[];
   ranks: RankedEntry[] | null;
   history: RankSnapshot[];
+  bestBySeason: SeasonBestRank[];
   searched: boolean;
 }
 
@@ -43,7 +47,6 @@ const RIOT_ID_KEY = 'tftCoach.riotId';
 
 const initialMatchesState: MatchesState = {
   count: 20,
-  season: 0,
   currentSet: 0,
   resultSet: 0,
   matches: [],
@@ -55,9 +58,13 @@ const initialMatchesState: MatchesState = {
 };
 
 const initialHistoryState: HistoryState = {
+  season: 0,
+  currentSet: 0,
+  allSeasonMatches: [],
   matches: [],
   ranks: null,
   history: [],
+  bestBySeason: [],
   searched: false,
 };
 

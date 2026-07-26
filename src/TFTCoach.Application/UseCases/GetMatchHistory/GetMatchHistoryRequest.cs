@@ -15,8 +15,10 @@ public sealed class GetMatchHistoryRequest
     public int Count { get; init; } = 10;
 
     /// <summary>
-    /// Target TFT set (season) to return. 0 (default) means the current set.
-    /// A specific older set is fetched on demand from Riot (rate-limited).
+    /// Target TFT set (season) to return.
+    /// 0 (default) means the current set.
+    /// A positive value fetches that specific set on demand from Riot.
+    /// A negative value returns all sets.
     /// </summary>
     public int Set { get; init; }
 }

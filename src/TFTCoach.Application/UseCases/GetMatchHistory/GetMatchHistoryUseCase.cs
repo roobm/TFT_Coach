@@ -24,10 +24,10 @@ public sealed class GetMatchHistoryUseCase(
         // player's match ids. A positive count is clamped to a single page request.
         var count = request.Count <= 0 ? int.MaxValue : Math.Clamp(request.Count, 1, 200);
 
-        // When a specific season is requested we must page through every match id
-        // (the target set may be far older than the newest games); otherwise the
-        // newest `count` ids already cover the current set.
-        var idFetchCount = request.Set > 0 ? int.MaxValue : count;
+        // Specific-season and all-season requests must page through all ids,
+        // because older sets may be far behind the newest games.
+        var includeAllSets = request.Set < 0;
+        var idFetchCount = request.Set != 0 ? int.MaxValue : count;
 
         string puuid;
         try
@@ -51,10 +51,7 @@ public sealed class GetMatchHistoryUseCase(
 
         // Riot returns ids newest-first, but a match's set is only known after we
         // load its detail. The current set is the newest match's set; the target
-        // set is either an explicitly requested season or the current one. We walk
-        // newest→oldest, skipping newer sets and stopping once we pass below the
-        // target, so we never re-fetch the player's entire multi-season history
-        // unless they explicitly ask for an old season.
+        // set is either an explicitly requested season or the current one.
         var currentSet = await ResolveCurrentSetAsync(puuid, matchIds, cached, cancellationToken);
         var targetSet = request.Set > 0 ? request.Set : currentSet;
 
@@ -76,7 +73,7 @@ public sealed class GetMatchHistoryUseCase(
 
             // Legacy cached rows have no set recorded (0); treat them as current-season.
             var effectiveSet = match.SetNumber == 0 ? currentSet : match.SetNumber;
-            if (targetSet > 0 && effectiveSet > 0)
+            if (!includeAllSets && targetSet > 0 && effectiveSet > 0)
             {
                 if (effectiveSet > targetSet)
                 {
@@ -99,8 +96,12 @@ public sealed class GetMatchHistoryUseCase(
         await PersistNewAsync(puuid, fetched, cancellationToken);
 
         logger.LogInformation(
-            "Returned {Total} set-{Set} matches for {GameName}#{TagLine} ({Fetched} from Riot)",
-            matches.Count, targetSet, request.GameName, request.TagLine, fetched.Count);
+            "Returned {Total} {Scope} matches for {GameName}#{TagLine} ({Fetched} from Riot)",
+            matches.Count,
+            includeAllSets ? "all-sets" : $"set-{targetSet}",
+            request.GameName,
+            request.TagLine,
+            fetched.Count);
 
         return RequestResult<GetMatchHistoryResponse>.Ok(
             new GetMatchHistoryResponse
@@ -108,7 +109,7 @@ public sealed class GetMatchHistoryUseCase(
                 Puuid = puuid,
                 Matches = matches,
                 CurrentSet = currentSet,
-                Set = targetSet,
+                Set = includeAllSets ? -1 : targetSet,
             });
     }
 

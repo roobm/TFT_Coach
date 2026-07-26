@@ -14,4 +14,7 @@ public sealed class GetRanksResponse
 
     /// <summary>Recorded rank snapshots (oldest first), across all queues. May be empty.</summary>
     public required IReadOnlyList<RankSnapshot> History { get; init; }
+
+    /// <summary>Best achieved ranked standing for each TFT set, newest set first. May be empty.</summary>
+    public required IReadOnlyList<SeasonBestRank> BestBySeason { get; init; }
 }
