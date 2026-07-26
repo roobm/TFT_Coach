@@ -238,6 +238,30 @@ public class GetMatchHistoryUseCaseTests
         Assert.Equal(15, response.CurrentSet);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnAllSets_WhenSetIsNegative()
+    {
+        // Arrange — Set < 0 requests all seasons.
+        var sets = new Dictionary<string, int> { ["M1"] = 15, ["M2"] = 15, ["M3"] = 14, ["M4"] = 13 };
+        var client = new FakeRiotMatchClient("puuid", ["M1", "M2", "M3", "M4"], sets);
+        var useCase = NewUseCase(client, new RecordingMatchHistoryRepository());
+
+        // Act
+        var result = await useCase.ExecuteAsync(new GetMatchHistoryRequest
+        {
+            GameName = "Name",
+            TagLine = "TAG",
+            Count = 0,
+            Set = -1,
+        });
+        var response = AssertSuccess(result);
+
+        // Assert
+        Assert.Equal(["M1", "M2", "M3", "M4"], response.Matches.Select(m => m.MatchId).ToList());
+        Assert.Equal(int.MaxValue, client.LastCount);
+        Assert.Equal(-1, response.Set);
+    }
+
     private static GetMatchHistoryUseCase NewUseCase(IRiotMatchClient client, IMatchHistoryRepository repo)
         => new(client, repo, NullLogger<GetMatchHistoryUseCase>.Instance);
 

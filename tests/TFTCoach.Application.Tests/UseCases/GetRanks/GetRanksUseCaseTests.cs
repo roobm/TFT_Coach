@@ -93,7 +93,20 @@ public class GetRanksUseCaseTests
         {
             new RankedEntry { QueueType = "RANKED_TFT", Tier = "GOLD", Division = "II", LeaguePoints = 40, Wins = 12, Losses = 8 },
         };
-        var repo = new RecordingRankHistoryRepository();
+        var repo = new RecordingRankHistoryRepository
+        {
+            BestBySeason =
+            [
+                new SeasonBestRank
+                {
+                    SetNumber = 17,
+                    Tier = "GOLD",
+                    Division = "II",
+                    LeaguePoints = 40,
+                    RecordedAt = DateTimeOffset.UtcNow,
+                },
+            ],
+        };
         var useCase = NewUseCase(new FakeRiotMatchClient("puuid"), new FakeRiotLeagueClient(entries), repo);
 
         // Act
@@ -104,6 +117,7 @@ public class GetRanksUseCaseTests
         Assert.Equal("puuid", repo.RecordedPuuid);
         Assert.Single(repo.RecordedEntries);
         Assert.Single(response.History);
+        Assert.Single(response.BestBySeason);
     }
 
     [Fact]
@@ -123,6 +137,40 @@ public class GetRanksUseCaseTests
         // Assert
         Assert.Single(response.Entries);
         Assert.Empty(response.History);
+        Assert.Empty(response.BestBySeason);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnBestRanksBySeason_WhenAvailable()
+    {
+        // Arrange
+        var repo = new RecordingRankHistoryRepository
+        {
+            BestBySeason =
+            [
+                new SeasonBestRank
+                {
+                    SetNumber = 17,
+                    Tier = "EMERALD",
+                    Division = "I",
+                    LeaguePoints = 64,
+                    RecordedAt = DateTimeOffset.UtcNow,
+                },
+            ],
+        };
+        var useCase = NewUseCase(
+            new FakeRiotMatchClient("puuid"),
+            new FakeRiotLeagueClient([]),
+            repo);
+
+        // Act
+        var result = await useCase.ExecuteAsync(new GetRanksRequest { GameName = "Name", TagLine = "TAG" });
+        var response = AssertSuccess(result);
+
+        // Assert
+        var best = Assert.Single(response.BestBySeason);
+        Assert.Equal(17, best.SetNumber);
+        Assert.Equal("EMERALD", best.Tier);
     }
 
     private static GetRanksUseCase NewUseCase(
@@ -178,6 +226,7 @@ public class GetRanksUseCaseTests
     {
         public string? RecordedPuuid { get; private set; }
         public IReadOnlyList<RankedEntry> RecordedEntries { get; private set; } = [];
+        public IReadOnlyList<SeasonBestRank> BestBySeason { get; init; } = [];
 
         public Task RecordAsync(string puuid, IReadOnlyList<RankedEntry> entries, CancellationToken cancellationToken = default)
         {
@@ -200,6 +249,11 @@ public class GetRanksUseCaseTests
                         RecordedAt = DateTimeOffset.UtcNow,
                     })
                     .ToList());
+
+        public Task<IReadOnlyList<SeasonBestRank>> GetBestBySeasonAsync(
+            string puuid,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(BestBySeason);
     }
 
     private sealed class ThrowingRankHistoryRepository : IRankHistoryRepository
@@ -209,5 +263,10 @@ public class GetRanksUseCaseTests
 
         public Task<IReadOnlyList<RankSnapshot>> GetHistoryAsync(string puuid, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("history read failed");
+
+        public Task<IReadOnlyList<SeasonBestRank>> GetBestBySeasonAsync(
+            string puuid,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("season best read failed");
     }
 }

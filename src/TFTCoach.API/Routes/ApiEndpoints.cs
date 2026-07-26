@@ -50,7 +50,8 @@ internal static class ApiEndpoints
         })
             .WithSummary("Get TFT match history")
             .WithDescription("Fetches a player's recent TFT matches from Riot using a Riot ID formatted as gameName#tagLine. "
-                + "Use count to limit how many matches are returned and set to filter by TFT set.");
+                + "Use count to limit how many matches are returned. set=0 (default) returns current set, "
+                + "set>0 filters to that set, and set<0 returns all sets.");
 
         // POST /matches/analysis  { "matches": [...] }
         app.MapPost("/matches/analysis", async (AnalyzeMatchHistoryRequest request, AnalyzeMatchHistoryUseCase useCase, ILogger<Program> logger, CancellationToken ct) =>

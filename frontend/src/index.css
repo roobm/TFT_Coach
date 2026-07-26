@@ -327,6 +327,117 @@ button:disabled {
   color: var(--accent-strong);
 }
 
+/* ---------- History page ---------- */
+.history-loading {
+  margin-top: 0.2rem;
+}
+
+.history-loading-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.history-sk-title {
+  width: 42%;
+  height: 14px;
+}
+
+.history-sk-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.history-sk-stat {
+  height: 66px;
+}
+
+.history-sk-chart {
+  height: 180px;
+}
+
+.history-results {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.history-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 700;
+}
+
+.history-title {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+
+.history-season-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 65%, transparent);
+  color: var(--text);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.77rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.history-stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev-1);
+  padding: 0.82rem 0.9rem;
+}
+
+.history-stat-card-peak {
+  border-color: rgba(245, 196, 81, 0.35);
+  background: linear-gradient(180deg, rgba(245, 196, 81, 0.15), rgba(245, 196, 81, 0.04));
+}
+
+.history-stat-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.history-stat-value {
+  margin: 0.42rem 0 0.3rem;
+  color: var(--text);
+  font-size: 0.97rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.history-stat-note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
 /* ---------- Insights ---------- */
 .insights {
   position: relative;
@@ -1019,6 +1130,85 @@ button:disabled {
   font-weight: 600;
 }
 
+.history-rank-panel {
+  padding-top: 1rem;
+}
+
+.history-rank-panel-head {
+  gap: 0.32rem;
+  margin-bottom: 0.75rem;
+}
+
+.history-rank-panel-head p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.history-rank-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+  gap: 0.95rem;
+  align-items: start;
+}
+
+.history-season-chart-wrap {
+  padding: 0.65rem 0.7rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+}
+
+.history-season-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.history-season-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  padding: 0.64rem 0.72rem;
+}
+
+.history-season-row.selected {
+  border-color: rgba(245, 196, 81, 0.46);
+  background: linear-gradient(180deg, rgba(245, 196, 81, 0.12), rgba(245, 196, 81, 0.05));
+}
+
+.history-season-row-set {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-season-row-main {
+  min-width: 0;
+}
+
+.history-season-row-rank {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.history-season-row-date {
+  display: block;
+  margin-top: 0.18rem;
+  color: var(--text-faint);
+  font-size: 0.73rem;
+}
+
 .rank-player {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1147,6 +1337,17 @@ button:disabled {
   color: var(--text-muted);
 }
 
+.rank-card-peak {
+  justify-content: center;
+}
+
+.rank-peak-card-value {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ---------- Rank climb chart ---------- */
 .climb {
   background: var(--bg-elev-1);
@@ -1169,6 +1370,20 @@ button:disabled {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
+}
+
+.climb-metrics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.climb-peak {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .climb-net {
@@ -1290,6 +1505,66 @@ button:disabled {
   border-top-color: var(--gold);
 }
 
+.season-rank-card::before {
+  background: var(--gold);
+}
+
+.season-peak-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.season-peak-line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.season-peak-dot {
+  fill: var(--gold);
+  stroke: var(--bg-elev-1);
+  stroke-width: 1.8;
+}
+
+.season-peak-dot.selected {
+  fill: #fff;
+  stroke: var(--gold);
+  stroke-width: 2.5;
+}
+
+.season-peak-dot.missing {
+  fill: transparent;
+  stroke: var(--text-faint);
+  stroke-width: 1.4;
+  opacity: 0.7;
+}
+
+.season-peak-dot.missing.selected {
+  stroke: var(--gold);
+  opacity: 1;
+}
+
+.season-peak-set-label {
+  fill: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.season-peak-grid {
+  stroke: var(--border);
+  stroke-dasharray: 2 4;
+  stroke-width: 1;
+  opacity: 0.62;
+}
+
+.season-peak-axis-label {
+  fill: var(--text-faint);
+  font-size: 9.5px;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 480px) {
   .app {
@@ -1319,6 +1594,20 @@ button:disabled {
 
   .results-header button {
     width: 100%;
+  }
+
+  .history-sk-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .history-rank-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .history-season-list {
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   }
 }
 

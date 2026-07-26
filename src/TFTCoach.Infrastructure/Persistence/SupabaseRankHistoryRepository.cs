@@ -14,6 +14,29 @@ public sealed class SupabaseRankHistoryRepository(
     string connectionString,
     ILogger<SupabaseRankHistoryRepository> logger) : IRankHistoryRepository
 {
+    private const int RankedTftQueueId = 1100;
+    private const int TierBand = 400;
+    private static readonly Dictionary<string, int> TierOrder = new(StringComparer.Ordinal)
+    {
+        ["IRON"] = 0,
+        ["BRONZE"] = 1,
+        ["SILVER"] = 2,
+        ["GOLD"] = 3,
+        ["PLATINUM"] = 4,
+        ["EMERALD"] = 5,
+        ["DIAMOND"] = 6,
+        ["MASTER"] = 7,
+        ["GRANDMASTER"] = 8,
+        ["CHALLENGER"] = 9,
+    };
+    private static readonly Dictionary<string, int> DivisionOrder = new(StringComparer.Ordinal)
+    {
+        ["IV"] = 0,
+        ["III"] = 1,
+        ["II"] = 2,
+        ["I"] = 3,
+    };
+
     public async Task RecordAsync(
         string puuid,
         IReadOnlyList<RankedEntry> entries,
@@ -125,6 +148,108 @@ public sealed class SupabaseRankHistoryRepository(
         }
     }
 
+    public async Task<IReadOnlyList<SeasonBestRank>> GetBestBySeasonAsync(
+        string puuid,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(puuid))
+        {
+            return [];
+        }
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            const string sql = """
+                SELECT
+                    COALESCE(
+                        (
+                            SELECT mh.set_number
+                            FROM match_history mh
+                            WHERE mh.puuid = rh.puuid
+                              AND mh.queue_id = @queue_id
+                              AND mh.set_number > 0
+                              AND mh.played_at <= rh.recorded_at
+                            ORDER BY mh.played_at DESC
+                            LIMIT 1
+                        ),
+                        (
+                            SELECT mh2.set_number
+                            FROM match_history mh2
+                            WHERE mh2.puuid = rh.puuid
+                              AND mh2.queue_id = @queue_id
+                              AND mh2.set_number > 0
+                            ORDER BY ABS(EXTRACT(EPOCH FROM (mh2.played_at - rh.recorded_at))) ASC
+                            LIMIT 1
+                        )
+                    ) AS set_number,
+                    rh.tier,
+                    rh.division,
+                    rh.league_points,
+                    rh.recorded_at
+                FROM rank_history rh
+                WHERE rh.puuid = @puuid
+                  AND rh.queue_type = 'RANKED_TFT'
+                  AND rh.tier IS NOT NULL
+                ORDER BY rh.recorded_at ASC
+                """;
+
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("puuid", puuid);
+            command.Parameters.AddWithValue("queue_id", RankedTftQueueId);
+
+            var bestBySet = new Dictionary<int, (SeasonBestRank Rank, int Score)>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(1))
+                {
+                    continue;
+                }
+
+                var setNumber = reader.GetInt32(0);
+                var tier = reader.GetString(1);
+                var division = reader.IsDBNull(2) ? null : reader.GetString(2);
+                var leaguePoints = reader.IsDBNull(3) ? 0 : reader.GetInt32(3);
+                var recordedAt = new DateTimeOffset(reader.GetDateTime(4), TimeSpan.Zero);
+
+                var score = RankScore(tier, division, leaguePoints);
+                if (score < 0)
+                {
+                    continue;
+                }
+
+                var candidate = new SeasonBestRank
+                {
+                    SetNumber = setNumber,
+                    Tier = tier,
+                    Division = division,
+                    LeaguePoints = leaguePoints,
+                    RecordedAt = recordedAt,
+                };
+
+                if (!bestBySet.TryGetValue(setNumber, out var current)
+                    || score > current.Score
+                    || (score == current.Score && candidate.RecordedAt > current.Rank.RecordedAt))
+                {
+                    bestBySet[setNumber] = (candidate, score);
+                }
+            }
+
+            return bestBySet.Values
+                .Select(value => value.Rank)
+                .OrderByDescending(rank => rank.SetNumber)
+                .ToList();
+        }
+        catch (NpgsqlException ex)
+        {
+            logger.LogError(ex, "Failed to read season best ranks from Supabase.");
+            throw;
+        }
+    }
+
     private static async Task<bool> MatchesLatestAsync(
         NpgsqlConnection connection,
         string latestSql,
@@ -153,5 +278,25 @@ public sealed class SupabaseRankHistoryRepository(
             && leaguePoints == entry.LeaguePoints
             && wins == entry.Wins
             && losses == entry.Losses;
+    }
+
+    private static int RankScore(string tier, string? division, int leaguePoints)
+    {
+        if (!TierOrder.TryGetValue(tier, out var tierIndex))
+        {
+            return -1;
+        }
+
+        var baseScore = tierIndex * TierBand;
+        if (tierIndex >= TierOrder["MASTER"])
+        {
+            return baseScore + Math.Max(0, leaguePoints);
+        }
+
+        var divisionIndex = division is not null && DivisionOrder.TryGetValue(division, out var resolvedDivision)
+            ? resolvedDivision
+            : 0;
+
+        return baseScore + divisionIndex * 100 + Math.Max(0, leaguePoints);
     }
 }

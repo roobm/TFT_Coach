@@ -20,4 +20,9 @@ public interface IRankHistoryRepository
     /// Returns the recorded snapshots for a PUUID, oldest first, across all queues.
     /// </summary>
     Task<IReadOnlyList<RankSnapshot>> GetHistoryAsync(string puuid, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the highest achieved Ranked TFT standing for each recorded TFT set.
+    /// </summary>
+    Task<IReadOnlyList<SeasonBestRank>> GetBestBySeasonAsync(string puuid, CancellationToken cancellationToken = default);
 }

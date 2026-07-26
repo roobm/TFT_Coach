@@ -65,17 +65,25 @@ function RankEntryCard({ entry }: { entry: RankedEntry }) {
         </span>
         <span className="rank-winrate">{winRate}% win</span>
       </div>
+
     </div>
   );
 }
 
-export function RankCard({ riotId, entries }: { riotId: string; entries: RankedEntry[] }) {
+export function RankCard({
+  riotId,
+  entries,
+  peakLabel,
+}: {
+  riotId: string;
+  entries: RankedEntry[];
+  peakLabel?: string | null;
+}) {
   // Show meaningful queues first; standard ranked before the rest.
   const ordered = [...entries].sort((a, b) => {
     const rank = (q: string) => (q === 'RANKED_TFT' ? 0 : q === 'RANKED_TFT_DOUBLE_UP' ? 1 : 2);
     return rank(a.queueType) - rank(b.queueType);
   });
-
   return (
     <section className="rank-panel" aria-label="Ranked standing">
       <div className="rank-panel-head">
@@ -90,6 +98,14 @@ export function RankCard({ riotId, entries }: { riotId: string; entries: RankedE
           {ordered.map((entry) => (
             <RankEntryCard key={entry.queueType} entry={entry} />
           ))}
+          {peakLabel && (
+            <article className="rank-card rank-card-peak">
+              <div className="rank-card-head">
+                <span className="rank-queue">Season peak</span>
+              </div>
+              <p className="rank-peak-card-value">{peakLabel}</p>
+            </article>
+          )}
         </div>
       )}
     </section>

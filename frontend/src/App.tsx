@@ -8,9 +8,7 @@ import { MatchListSkeleton } from './components/MatchListSkeleton';
 import { MatchStats } from './components/MatchStats';
 import { RankCard } from './components/RankCard';
 import { RankClimbChart } from './components/RankClimbChart';
-
-// Previous TFT sets offered in the season picker (newest current set minus N).
-const SEASON_LOOKBACK = 6;
+import { getSeasonPeakLabel } from './components/SeasonPeakCard';
 
 function SearchIcon() {
   return (
@@ -42,14 +40,14 @@ function EmptyIcon() {
 
 export default function App() {
   const { riotId, setRiotId, matchesState, setMatchesState } = useOutletContext<AppContext>();
-  const { count, season, currentSet, resultSet, matches, puuid, ranks, rankHistory, searchedRiotId, analysis } =
+  const { count, resultSet, matches, puuid, ranks, rankHistory, searchedRiotId, analysis } =
     matchesState;
   const update = (patch: Partial<MatchesState>) => setMatchesState((s) => ({ ...s, ...patch }));
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function runSearch(nextCount: number, nextSeason: number) {
+  async function runSearch(nextCount: number) {
     const trimmed = riotId.trim();
     if (trimmed.length === 0) {
       return;
@@ -70,7 +68,7 @@ export default function App() {
     const ranksPromise = fetchRanks(trimmed).catch(() => null);
 
     try {
-      const result = await fetchMatchHistory(trimmed, nextCount, nextSeason);
+      const result = await fetchMatchHistory(trimmed, nextCount, 0);
       update({
         matches: result.matches,
         puuid: result.puuid,
@@ -84,20 +82,15 @@ export default function App() {
     }
 
     const rankResult = await ranksPromise;
-    update({ ranks: rankResult?.entries ?? null, rankHistory: rankResult?.history ?? [] });
+    update({
+      ranks: rankResult?.entries ?? null,
+      rankHistory: rankResult?.history ?? [],
+    });
   }
 
   function handleSearch(event: React.FormEvent) {
     event.preventDefault();
-    void runSearch(count, season);
-  }
-
-  // Switching season is an explicit "show me that season" action — load it now.
-  function handleSeasonChange(nextSeason: number) {
-    update({ season: nextSeason });
-    if (searchedRiotId.length > 0) {
-      void runSearch(count, nextSeason);
-    }
+    void runSearch(count);
   }
 
   async function handleAnalyze() {
@@ -114,8 +107,6 @@ export default function App() {
     }
   }
 
-  const seasonOptions = buildSeasonOptions(currentSet);
-
   return (
     <>
       <form className="search" onSubmit={handleSearch}>
@@ -129,19 +120,6 @@ export default function App() {
             aria-label="Riot ID"
           />
         </div>
-        <select
-          className="count-select"
-          value={season}
-          onChange={(e) => handleSeasonChange(Number(e.target.value))}
-          aria-label="Season"
-          disabled={loadingMatches}
-        >
-          {seasonOptions.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
         <select
           className="count-select"
           value={count}
@@ -208,7 +186,17 @@ export default function App() {
 
           {analysis && <AnalysisPanel analysis={analysis} />}
 
-          {ranks && <RankCard riotId={searchedRiotId} entries={ranks} />}
+          {ranks && (
+            <RankCard
+              riotId={searchedRiotId}
+              entries={ranks}
+              peakLabel={getSeasonPeakLabel({
+                current: ranks.find((entry) => entry.queueType === 'RANKED_TFT'),
+                matches,
+                history: rankHistory,
+              })}
+            />
+          )}
 
           {ranks && (
             <RankClimbChart
@@ -233,16 +221,4 @@ export default function App() {
       )}
     </>
   );
-}
-
-// Season picker options: "This season" plus the previous few sets, fetched on
-// demand. Older sets are only known once the current set is resolved by a search.
-function buildSeasonOptions(currentSet: number): { value: number; label: string }[] {
-  const options = [
-    { value: 0, label: currentSet > 0 ? `This season (Set ${currentSet})` : 'This season' },
-  ];
-  for (let set = currentSet - 1; set >= Math.max(1, currentSet - SEASON_LOOKBACK); set--) {
-    options.push({ value: set, label: `Set ${set}` });
-  }
-  return options;
 }

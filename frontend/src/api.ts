@@ -6,6 +6,7 @@ export interface UnitDetail {
 
 export interface TftMatchResult {
   matchId: string;
+  setNumber: number;
   playedAt: string;
   durationSeconds: number;
   queueId: number;
@@ -84,10 +85,19 @@ export interface RankSnapshot {
   recordedAt: string;
 }
 
+export interface SeasonBestRank {
+  setNumber: number;
+  tier: string;
+  division: string | null;
+  leaguePoints: number;
+  recordedAt: string;
+}
+
 export interface RanksResponse {
   puuid: string;
   entries: RankedEntry[];
   history: RankSnapshot[];
+  bestBySeason: SeasonBestRank[];
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5214';
@@ -120,7 +130,7 @@ async function readEnvelope<T>(response: Response): Promise<T> {
 
 export async function fetchMatchHistory(riotId: string, count = 10, set = 0): Promise<MatchHistoryResponse> {
   const params = new URLSearchParams({ riotId, count: String(count) });
-  if (set > 0) {
+  if (set !== 0) {
     params.set('set', String(set));
   }
   const response = await fetch(`${API_BASE}/matches?${params.toString()}`);

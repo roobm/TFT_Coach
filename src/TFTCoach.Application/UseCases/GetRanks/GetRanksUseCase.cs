@@ -37,10 +37,11 @@ public sealed class GetRanksUseCase(
 
         await RecordSnapshotsAsync(puuid, entries, cancellationToken);
         var history = await LoadHistoryAsync(puuid, cancellationToken);
+        var bestBySeason = await LoadBestBySeasonAsync(puuid, cancellationToken);
 
         logger.LogInformation(
-            "Returned {Count} ranked entries ({History} history points) for {GameName}#{TagLine}",
-            entries.Count, history.Count, request.GameName, request.TagLine);
+            "Returned {Count} ranked entries ({History} history points, {BestBySeason} season peaks) for {GameName}#{TagLine}",
+            entries.Count, history.Count, bestBySeason.Count, request.GameName, request.TagLine);
 
         return RequestResult<GetRanksResponse>.Ok(
             new GetRanksResponse
@@ -48,6 +49,7 @@ public sealed class GetRanksUseCase(
                 Puuid = puuid,
                 Entries = entries,
                 History = history,
+                BestBySeason = bestBySeason,
             });
     }
 
@@ -84,6 +86,22 @@ public sealed class GetRanksUseCase(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to read rank history; returning none.");
+            return [];
+        }
+    }
+
+    // Best-by-season reads are best-effort: if storage is unavailable we return none.
+    private async Task<IReadOnlyList<SeasonBestRank>> LoadBestBySeasonAsync(
+        string puuid,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await rankHistoryRepository.GetBestBySeasonAsync(puuid, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to read season best ranks; returning none.");
             return [];
         }
     }
